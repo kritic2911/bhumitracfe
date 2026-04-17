@@ -29,6 +29,7 @@ Last updated: 2026-04-08
 
 - `setup.md` — local setup, environment variables, database migrations, and hosting notes (Vercel + Render + Supabase-style).
 - `progress.md` — this file.
+- Added GitHub Actions keepalive workflow at `.github/workflows/keepalive.yml` to ping backend health endpoint every 10 minutes.
 
 ---
 

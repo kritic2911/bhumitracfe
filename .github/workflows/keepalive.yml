@@ -1,0 +1,22 @@
+name: Keepalive Ping
+
+on:
+  schedule:
+    # Every 10 minutes
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health endpoint
+        env:
+          HEALTHCHECK_URL: ${{ secrets.BACKEND_HEALTHCHECK_URL }}
+        run: |
+          if [ -z "$HEALTHCHECK_URL" ]; then
+            echo "BACKEND_HEALTHCHECK_URL secret is missing."
+            exit 1
+          fi
+          echo "Pinging $HEALTHCHECK_URL"
+          curl --silent --show-error --fail --location --max-time 25 --retry 2 "$HEALTHCHECK_URL"

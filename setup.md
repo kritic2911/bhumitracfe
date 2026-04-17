@@ -154,7 +154,26 @@ This is one common pattern; adapt names to your provider.
 
 ---
 
-## 8. Repository layout
+## 8. Keepalive pings (Render + Supabase free tiers)
+
+If traffic is low, free-tier services may sleep and the first request can be slow.  
+This repo includes `.github/workflows/keepalive.yml` to ping your backend every 10 minutes.
+
+### Enable it
+
+1. Push this repo to GitHub.
+2. In GitHub repo settings, add secret:
+   - `BACKEND_HEALTHCHECK_URL` = `https://<your-render-service>.onrender.com/test-db`
+3. In **Actions**, enable workflows if prompted.
+4. Optionally run **Keepalive Ping** once via **Run workflow**.
+
+Notes:
+- This keeps your Render service and DB path warm more consistently, but free platforms can still sleep or throttle.
+- If you want truly always-on behavior, use paid plans.
+
+---
+
+## 9. Repository layout
 
 ```
 bhumitracfe/
