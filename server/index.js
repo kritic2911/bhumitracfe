@@ -31,7 +31,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 // Ensure preflight requests are handled for all routes.
-app.options("*", cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 
 app.post("/admin/login", (req, res) => {
