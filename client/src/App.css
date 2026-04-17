@@ -95,9 +95,10 @@
 }
 
 input::placeholder,
-textarea::placeholder {
-  color: var(--placeholder-color, #7d8f84);
-  opacity: 1;
+textarea::placeholder,
+.form-control::placeholder {
+  color: var(--placeholder-color, #7d8f84) !important;
+  opacity: 1 !important;
 }
 
 .blog-magazine-layout {
@@ -117,6 +118,14 @@ textarea::placeholder {
 .blog-center-card,
 .blog-card-sm {
   overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.blog-card:hover,
+.blog-card-sm:hover,
+.blog-center-card:hover {
+  transform: translateY(-2px);
 }
 
 .blog-card-image,
@@ -158,6 +167,67 @@ textarea::placeholder {
 
 .blog-archive h3 {
   margin-bottom: 1rem;
+}
+
+.blog-reader {
+  max-width: 860px;
+  margin: 0 auto 2rem;
+  border-radius: 18px;
+  padding: 1.35rem 1.35rem 2rem;
+}
+
+.blog-reader-back {
+  background: transparent;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.8rem;
+  margin-bottom: 1.2rem;
+}
+
+.blog-reader-header {
+  max-width: 680px;
+  margin: 0 auto 1rem;
+}
+
+.blog-reader-title {
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  line-height: 1.18;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  letter-spacing: -0.01em;
+}
+
+.blog-reader-subheading {
+  font-size: clamp(1rem, 1.5vw, 1.22rem);
+  line-height: 1.45;
+  margin-bottom: 0.8rem;
+}
+
+.blog-reader-meta {
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+.blog-reader-image {
+  width: 100%;
+  max-width: 760px;
+  height: min(420px, 52vw);
+  object-fit: cover;
+  display: block;
+  margin: 1.15rem auto 1.5rem;
+  border-radius: 12px;
+}
+
+.blog-reader-content {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.blog-reader-content p {
+  font-size: 1.08rem;
+  line-height: 1.95;
+  margin-bottom: 1.2rem;
 }
 
 .admin-blog-form .form-control {

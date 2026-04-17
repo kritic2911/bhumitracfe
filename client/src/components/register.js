@@ -14,6 +14,7 @@ const Register = ({ theme }) => {
 
   const [errors, setErrors] = useState({});
   const [submitStatus, setSubmitStatus] = useState("");
+  const [errorText, setErrorText] = useState("");
   const [showOtherPurchase, setShowOtherPurchase] = useState(false);
 
   const purchaseOptions = [
@@ -78,6 +79,7 @@ const Register = ({ theme }) => {
   const onSubmit = async (e) => {
     e.preventDefault();
     setSubmitStatus("");
+    setErrorText("");
 
     if (!validateForm()) {
       setSubmitStatus("validation-error");
@@ -91,11 +93,20 @@ const Register = ({ theme }) => {
         purchase: purchase === "Other" ? other_purchase : purchase,
       };
 
-      const response = await fetch(`${API_URL}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(submitData),
-      });
+      let response;
+      try {
+        response = await fetch(`${API_URL}/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(submitData),
+        });
+      } catch (err) {
+        throw new Error(
+          `Network request failed to ${API_URL}/register. ${
+            err && err.message ? err.message : String(err)
+          }`
+        );
+      }
 
       const data = await response.json();
       if (response.ok) {
@@ -113,10 +124,12 @@ const Register = ({ theme }) => {
       } else {
         setSubmitStatus("error");
         console.error("Registration failed:", data.error);
+        setErrorText(data.error || "Registration failed");
       }
     } catch (err) {
       console.error(err.message);
       setSubmitStatus("error");
+      setErrorText(err.message || "Registration failed");
     }
   };
 
@@ -136,6 +149,7 @@ const Register = ({ theme }) => {
       {submitStatus === "error" && (
         <div className="alert alert-danger py-2 px-3 mb-3 rounded-3" role="alert">
           Something went wrong. Please try again.
+          {errorText ? <div className="small mt-1">{errorText}</div> : null}
         </div>
       )}
       <form onSubmit={onSubmit}>

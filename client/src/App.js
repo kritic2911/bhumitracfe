@@ -10,27 +10,47 @@ import Blog from "./components/Blog";
 import AdminDashboard from "./components/AdminDashboard";
 import ListUsers from "./components/listUsers";
 
-function pathToPage(path) {
-  switch (path) {
+function slugify(value) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function blogRouteSlug(post) {
+  const id = post?.blog_id ?? post?.id;
+  if (!id) return null;
+  const titleSlug = slugify(post?.title || "post");
+  return `${id}-${titleSlug}`;
+}
+
+function parseRoute(pathname) {
+  if (pathname.startsWith("/blog/")) {
+    const id = decodeURIComponent(pathname.replace("/blog/", "")).trim();
+    return { page: "blog", blogId: id || null };
+  }
+  switch (pathname) {
     case "/blog":
-      return "blog";
+      return { page: "blog", blogId: null };
     case "/register":
-      return "register";
+      return { page: "register", blogId: null };
     case "/products":
-      return "products";
+      return { page: "products", blogId: null };
     case "/list":
-      return "list";
+      return { page: "list", blogId: null };
     case "/admin":
-      return "admin";
+      return { page: "admin", blogId: null };
     default:
-      return "about";
+      return { page: "about", blogId: null };
   }
 }
 
-function pageToPath(page) {
+function pageToPath(page, blogId = null) {
   switch (page) {
     case "blog":
-      return "/blog";
+      return blogId ? `/blog/${encodeURIComponent(String(blogId))}` : "/blog";
     case "register":
       return "/register";
     case "products":
@@ -45,6 +65,12 @@ function pageToPath(page) {
 }
 
 function App() {
+  useEffect(() => {
+    // Helps diagnose Vercel -> Render connectivity (wrong API URL / mixed content / CORS).
+    // eslint-disable-next-line no-console
+    console.log("[bhumitra] API_URL =", API_URL);
+  }, []);
+
   const initialBlogs = [
     {
       blog_id: 1,
@@ -109,7 +135,9 @@ function App() {
     },
   ];
 
-  const [currentPage, setCurrentPage] = useState(() => pathToPage(window.location.pathname));
+  const initialRoute = parseRoute(window.location.pathname);
+  const [currentPage, setCurrentPage] = useState(initialRoute.page);
+  const [selectedBlogId, setSelectedBlogId] = useState(initialRoute.blogId);
   const [currentTheme, setCurrentTheme] = useState(themes.light);
   const isDarkTheme = currentTheme === themes.dark;
   const [blogs, setBlogs] = useState(initialBlogs);
@@ -189,7 +217,11 @@ function App() {
   }, [loadBlogs, loadProducts]);
 
   useEffect(() => {
-    const onPop = () => setCurrentPage(pathToPage(window.location.pathname));
+    const onPop = () => {
+      const next = parseRoute(window.location.pathname);
+      setCurrentPage(next.page);
+      setSelectedBlogId(next.blogId);
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -202,8 +234,9 @@ function App() {
     }
   }, [currentPage, isAuthenticated, authReady]);
 
-  const navigateTo = (page, path) => {
+  const navigateTo = (page, path, blogId = null) => {
     setCurrentPage(page);
+    setSelectedBlogId(blogId);
     if (window.location.pathname !== path) {
       window.history.pushState(null, "", path);
     }
@@ -221,7 +254,7 @@ function App() {
       setIsAuthenticated(true);
       setShowAuthModal(false);
       const nextPage = requestedPage || "admin";
-      navigateTo(nextPage, pageToPath(nextPage));
+      navigateTo(nextPage, pageToPath(nextPage), null);
     } catch (err) {
       setAuthError(err.message || "Login failed");
     }
@@ -230,10 +263,16 @@ function App() {
   const handleLogout = () => {
     setStoredAdminToken(null);
     setIsAuthenticated(false);
-    navigateTo("about", "/");
+    navigateTo("about", "/", null);
   };
 
-  const handleBlogNav = () => navigateTo("blog", "/blog");
+  const handleBlogNav = () => navigateTo("blog", "/blog", null);
+  const handleOpenBlogPost = (post) => {
+    const slug = blogRouteSlug(post);
+    if (!slug) return;
+    navigateTo("blog", pageToPath("blog", slug), String(slug));
+  };
+  const handleCloseBlogPost = () => navigateTo("blog", "/blog", null);
 
   return (
     <div
@@ -312,7 +351,15 @@ function App() {
         {currentPage === "about" && <AboutContact theme={currentTheme} />}
         {currentPage === "register" && <Register theme={currentTheme} />}
         {currentPage === "products" && <ProductCatalog theme={currentTheme} products={products} />}
-        {currentPage === "blog" && <Blog theme={currentTheme} posts={blogs} />}
+        {currentPage === "blog" && (
+          <Blog
+            theme={currentTheme}
+            posts={blogs}
+            selectedPostId={selectedBlogId}
+            onOpenPost={handleOpenBlogPost}
+            onClosePost={handleCloseBlogPost}
+          />
+        )}
         {currentPage === "list" && isAuthenticated && <ListUsers theme={currentTheme} />}
         {currentPage === "admin" && isAuthenticated && (
           <AdminDashboard

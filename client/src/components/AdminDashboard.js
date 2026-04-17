@@ -276,6 +276,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 value={blogForm.title}
                 onChange={(e) => handleBlogChange("title", e.target.value)}
                 style={inputStyle}
+                placeholder="Enter blog title"
               />
             </div>
             <div className="mb-3">
@@ -296,6 +297,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 value={blogForm.image}
                 onChange={(e) => handleBlogChange("image", e.target.value)}
                 style={inputStyle}
+                placeholder="Paste image URL (optional)"
               />
             </div>
             {blogForm.image && (
@@ -311,6 +313,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 value={blogForm.excerpt}
                 onChange={(e) => handleBlogChange("excerpt", e.target.value)}
                 style={inputStyle}
+                placeholder="Short excerpt for the blog card"
               />
             </div>
             <div className="mb-3">
@@ -321,6 +324,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 value={blogForm.content}
                 onChange={(e) => handleBlogChange("content", e.target.value)}
                 style={inputStyle}
+                placeholder="Write your blog post here..."
               />
             </div>
             <button
@@ -350,6 +354,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 value={productForm.name}
                 onChange={(e) => handleProductChange("name", e.target.value)}
                 style={inputStyle}
+                placeholder="Product name"
               />
             </div>
             <div className="mb-3">
@@ -360,6 +365,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 value={productForm.price}
                 onChange={(e) => handleProductChange("price", e.target.value)}
                 style={inputStyle}
+                placeholder="₹199/L or ₹49-69"
               />
             </div>
             <div className="mb-3">
@@ -370,6 +376,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 value={productForm.description}
                 onChange={(e) => handleProductChange("description", e.target.value)}
                 style={inputStyle}
+                placeholder="Product description"
               />
             </div>
             <div className="mb-3">
@@ -390,6 +397,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 value={productForm.image}
                 onChange={(e) => handleProductChange("image", e.target.value)}
                 style={inputStyle}
+                placeholder="Paste image URL (optional)"
               />
             </div>
             {productForm.image && (

@@ -6,12 +6,32 @@ const { createAdminToken, verifyAdminToken, adminAuthMiddleware } = require("./a
 
 const app = express();
 
-const corsOrigin = process.env.CORS_ORIGIN;
+const corsOriginEnv = process.env.CORS_ORIGIN;
+const allowedOrigins = corsOriginEnv && corsOriginEnv.trim() !== ""
+  ? corsOriginEnv
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  : null;
+
 const corsOptions = {
-  origin: corsOrigin ? corsOrigin.split(",").map((s) => s.trim()) : true,
-  credentials: true,
+  // If CORS_ORIGIN is set, allow only those exact origins; otherwise allow all.
+  origin: (origin, callback) => {
+    // Non-browser requests often have no Origin header.
+    if (!origin) return callback(null, true);
+    if (!allowedOrigins) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false,
+  optionsSuccessStatus: 204,
 };
+
 app.use(cors(corsOptions));
+// Ensure preflight requests are handled for all routes.
+app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 
 app.post("/admin/login", (req, res) => {

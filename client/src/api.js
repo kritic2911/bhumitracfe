@@ -18,13 +18,29 @@ export function adminHeaders() {
   return h;
 }
 
+async function fetchJson(url, options) {
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (err) {
+    // Browsers often throw a generic TypeError for CORS/mixed-content/network failures.
+    throw new Error(
+      `Network request failed to ${url}. ${
+        err && err.message ? err.message : String(err)
+      }`
+    );
+  }
+
+  const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
 export async function adminLogin(password) {
-  const res = await fetch(`${API_URL}/admin/login`, {
+  const { res, data } = await fetchJson(`${API_URL}/admin/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
   });
-  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Login failed");
   if (data.token) setStoredAdminToken(data.token);
   return data;
@@ -33,7 +49,7 @@ export async function adminLogin(password) {
 export async function adminSessionCheck() {
   const t = getStoredAdminToken();
   if (!t) return false;
-  const res = await fetch(`${API_URL}/admin/session`, { headers: adminHeaders() });
+  const { res } = await fetchJson(`${API_URL}/admin/session`, { headers: adminHeaders() });
   if (!res.ok) {
     setStoredAdminToken(null);
     return false;
