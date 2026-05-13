@@ -1,5 +1,7 @@
 # Bhumitra CFE
 
+*Link to the website: https://bhumitracfe.vercel.app/*
+
 **Bhumitra Citizens For Environment** — community site for eco-friendly products, blog content, and registrations, with a password-protected admin area.
 
 - **Specification:** [SUMMARY.md](./SUMMARY.md)
