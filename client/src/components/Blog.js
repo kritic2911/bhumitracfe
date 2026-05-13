@@ -48,7 +48,7 @@ const Blog = ({ theme, posts, selectedPostId, onOpenPost, onClosePost }) => {
         Blog
       </h2>
       <p className="text-center mb-5 small" style={{ color: theme.muted }}>
-        Stories on products, reuse, and community work.
+        Community blogs
       </p>
 
       {selectedPost ? (

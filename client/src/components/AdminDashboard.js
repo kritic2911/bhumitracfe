@@ -18,7 +18,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
     name: "",
     price: "",
     description: "",
-    image: "",
+    images: [],
   });
   const [statusMessage, setStatusMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -30,7 +30,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
 
   const resetProductForm = () => {
     setSelectedProduct(null);
-    setProductForm({ name: "", price: "", description: "", image: "" });
+    setProductForm({ name: "", price: "", description: "", images: [] });
   };
 
   const handleBlogChange = (field, value) => {
@@ -49,12 +49,26 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
     setProductForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleProductImageUpload = (file) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      setProductForm((prev) => ({ ...prev, image: reader.result }));
-    };
-    reader.readAsDataURL(file);
+  const handleProductImageUpload = (files) => {
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProductForm((prev) => ({ ...prev, images: [...prev.images, reader.result] }));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeProductImage = (index) => {
+    setProductForm((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index),
+    }));
+  };
+
+  const addProductImageUrl = (url) => {
+    if (!url.trim()) return;
+    setProductForm((prev) => ({ ...prev, images: [...prev.images, url.trim()] }));
   };
 
   const showStatus = (message) => {
@@ -115,11 +129,13 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
 
     setSaving(true);
     try {
+      const imgList = productForm.images.length > 0 ? productForm.images : ["/products/activator.jpg"];
       const payload = {
         name: productForm.name,
         price: productForm.price,
         description: productForm.description,
-        image: productForm.image || "/products/activator.jpg",
+        image: imgList[0],
+        images: imgList,
       };
 
       const response = await fetch(
@@ -161,11 +177,18 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
 
   const editProduct = (product) => {
     setSelectedProduct(product);
+    // Build images list from the product_images array (objects with .image) or fall back to single image
+    let imgs = [];
+    if (product.images && product.images.length > 0) {
+      imgs = product.images.map((img) => (typeof img === "string" ? img : img.image));
+    } else if (product.image) {
+      imgs = [product.image];
+    }
     setProductForm({
       name: product.name,
       price: product.price,
       description: product.description,
-      image: product.image || "",
+      images: imgs,
     });
     setShowProductForm(true);
   };
@@ -380,29 +403,82 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
               />
             </div>
             <div className="mb-3">
-              <label className="form-label small">Image file</label>
+              <label className="form-label small">Product images (files)</label>
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 className="form-control rounded-3"
-                onChange={(e) => e.target.files[0] && handleProductImageUpload(e.target.files[0])}
+                onChange={(e) => e.target.files.length > 0 && handleProductImageUpload(e.target.files)}
                 style={inputStyle}
               />
             </div>
             <div className="mb-3">
-              <label className="form-label small">Or image URL</label>
-              <input
-                type="text"
-                className="form-control rounded-3"
-                value={productForm.image}
-                onChange={(e) => handleProductChange("image", e.target.value)}
-                style={inputStyle}
-                placeholder="Paste image URL (optional)"
-              />
+              <label className="form-label small">Or add image by URL</label>
+              <div className="d-flex gap-2">
+                <input
+                  type="text"
+                  className="form-control rounded-3"
+                  id="product-image-url-input"
+                  style={inputStyle}
+                  placeholder="Paste image URL and click Add"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addProductImageUrl(e.target.value);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm rounded-pill px-3"
+                  style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent", whiteSpace: "nowrap" }}
+                  onClick={() => {
+                    const input = document.getElementById("product-image-url-input");
+                    if (input) {
+                      addProductImageUrl(input.value);
+                      input.value = "";
+                    }
+                  }}
+                >
+                  Add
+                </button>
+              </div>
             </div>
-            {productForm.image && (
+            {productForm.images.length > 0 && (
               <div className="mb-3">
-                <img src={productForm.image} alt="" className="img-fluid rounded-3" style={{ maxHeight: "240px" }} />
+                <label className="form-label small">Image previews ({productForm.images.length})</label>
+                <div className="d-flex flex-wrap gap-2">
+                  {productForm.images.map((img, idx) => (
+                    <div key={idx} className="position-relative" style={{ width: "90px", height: "90px" }}>
+                      <img
+                        src={img}
+                        alt=""
+                        className="rounded-3"
+                        style={{ width: "100%", height: "100%", objectFit: "cover", border: `1px solid ${theme.borderColor}` }}
+                      />
+                      <button
+                        type="button"
+                        className="position-absolute top-0 end-0 border-0 rounded-circle d-flex align-items-center justify-content-center"
+                        style={{
+                          width: "20px",
+                          height: "20px",
+                          fontSize: "0.65rem",
+                          backgroundColor: "rgba(200,50,50,0.85)",
+                          color: "#fff",
+                          transform: "translate(30%, -30%)",
+                          cursor: "pointer",
+                          lineHeight: 1,
+                        }}
+                        onClick={() => removeProductImage(idx)}
+                        aria-label={`Remove image ${idx + 1}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             <button
@@ -427,7 +503,11 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 style={{ backgroundColor: theme.surface || theme.cardBackground, border: `1px solid ${theme.borderColor}` }}
               >
                 <div className="position-relative">
-                  <img src={product.image} alt="" className="w-100" style={{ objectFit: "cover", height: "200px" }} />
+                  <img src={
+                    (product.images && product.images.length > 0
+                      ? (typeof product.images[0] === "string" ? product.images[0] : product.images[0].image)
+                      : product.image) || "/products/activator.jpg"
+                  } alt="" className="w-100" style={{ objectFit: "cover", height: "200px" }} />
                   <div
                     className="position-absolute top-0 end-0 m-2 px-2 py-1 rounded-pill small fw-semibold"
                     style={{
@@ -437,6 +517,18 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                   >
                     {product.price}
                   </div>
+                  {product.images && product.images.length > 1 && (
+                    <div
+                      className="position-absolute bottom-0 start-0 m-2 px-2 py-1 rounded-pill small fw-semibold"
+                      style={{
+                        backgroundColor: "rgba(0,0,0,0.55)",
+                        color: "#fff",
+                        fontSize: "0.72rem",
+                      }}
+                    >
+                      {product.images.length} images
+                    </div>
+                  )}
                 </div>
                 <div className="card-body">
                   <h4 className="h6">{product.name}</h4>

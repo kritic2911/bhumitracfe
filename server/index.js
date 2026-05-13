@@ -117,7 +117,17 @@ app.put("/users/:id", adminAuthMiddleware, async (req, res) => {
 app.get("/products", async (req, res) => {
   try {
     const allProducts = await pool.query("SELECT * FROM products ORDER BY product_id DESC");
-    res.json(allProducts.rows);
+    const allImages = await pool.query("SELECT * FROM product_images ORDER BY product_id, sort_order");
+    const imagesByProduct = {};
+    for (const img of allImages.rows) {
+      if (!imagesByProduct[img.product_id]) imagesByProduct[img.product_id] = [];
+      imagesByProduct[img.product_id].push(img);
+    }
+    const rows = allProducts.rows.map((p) => ({
+      ...p,
+      images: imagesByProduct[p.product_id] || [],
+    }));
+    res.json(rows);
   } catch (err) {
     console.error("Fetch products error:", err.message);
     res.status(500).json({ error: err.message || "Error fetching products" });
@@ -126,7 +136,7 @@ app.get("/products", async (req, res) => {
 
 app.post("/products", adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, price, description, image } = req.body;
+    const { name, price, description, image, images } = req.body;
     if (!name || !price || !description) {
       return res.status(400).json({ error: "Name, price, and description are required" });
     }
@@ -134,7 +144,21 @@ app.post("/products", adminAuthMiddleware, async (req, res) => {
       "INSERT INTO products (name, price, description, image) VALUES ($1, $2, $3, $4) RETURNING *",
       [name, price, description, image || null]
     );
-    res.status(201).json(newProduct.rows[0]);
+    const productId = newProduct.rows[0].product_id;
+    // Insert images into product_images
+    const imgList = Array.isArray(images) && images.length > 0 ? images : (image ? [image] : []);
+    for (let i = 0; i < imgList.length; i++) {
+      await pool.query(
+        "INSERT INTO product_images (product_id, image, sort_order) VALUES ($1, $2, $3)",
+        [productId, imgList[i], i]
+      );
+    }
+    // Return product with images
+    const imgRows = await pool.query(
+      "SELECT * FROM product_images WHERE product_id = $1 ORDER BY sort_order",
+      [productId]
+    );
+    res.status(201).json({ ...newProduct.rows[0], images: imgRows.rows });
   } catch (err) {
     console.error("Create product error:", err.message);
     res.status(500).json({ error: err.message || "Error creating product" });
@@ -144,7 +168,7 @@ app.post("/products", adminAuthMiddleware, async (req, res) => {
 app.put("/products/:id", adminAuthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price, description, image } = req.body;
+    const { name, price, description, image, images } = req.body;
     if (!name || !price || !description) {
       return res.status(400).json({ error: "Name, price, and description are required" });
     }
@@ -155,7 +179,21 @@ app.put("/products/:id", adminAuthMiddleware, async (req, res) => {
     if (updatedProduct.rows.length === 0) {
       return res.status(404).json({ error: "Product not found" });
     }
-    res.json(updatedProduct.rows[0]);
+    // If images array is provided, replace all product_images
+    if (Array.isArray(images)) {
+      await pool.query("DELETE FROM product_images WHERE product_id = $1", [id]);
+      for (let i = 0; i < images.length; i++) {
+        await pool.query(
+          "INSERT INTO product_images (product_id, image, sort_order) VALUES ($1, $2, $3)",
+          [id, images[i], i]
+        );
+      }
+    }
+    const imgRows = await pool.query(
+      "SELECT * FROM product_images WHERE product_id = $1 ORDER BY sort_order",
+      [id]
+    );
+    res.json({ ...updatedProduct.rows[0], images: imgRows.rows });
   } catch (err) {
     console.error("Update product error:", err.message);
     res.status(500).json({ error: err.message || "Error updating product" });
@@ -165,6 +203,7 @@ app.put("/products/:id", adminAuthMiddleware, async (req, res) => {
 app.delete("/products/:id", adminAuthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    // product_images are deleted via ON DELETE CASCADE
     const deleted = await pool.query("DELETE FROM products WHERE product_id = $1", [id]);
     if (deleted.rowCount === 0) {
       return res.status(404).json({ error: "Product not found" });
@@ -173,6 +212,47 @@ app.delete("/products/:id", adminAuthMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Delete product error:", err.message);
     res.status(500).json({ error: err.message || "Error deleting product" });
+  }
+});
+
+// --- Product images CRUD ---
+
+app.post("/products/:id/images", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ error: "image is required" });
+    // Get next sort_order
+    const maxOrder = await pool.query(
+      "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM product_images WHERE product_id = $1",
+      [id]
+    );
+    const nextOrder = maxOrder.rows[0].max_order + 1;
+    const newImg = await pool.query(
+      "INSERT INTO product_images (product_id, image, sort_order) VALUES ($1, $2, $3) RETURNING *",
+      [id, image, nextOrder]
+    );
+    res.status(201).json(newImg.rows[0]);
+  } catch (err) {
+    console.error("Add product image error:", err.message);
+    res.status(500).json({ error: err.message || "Error adding product image" });
+  }
+});
+
+app.delete("/products/:productId/images/:imageId", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { productId, imageId } = req.params;
+    const deleted = await pool.query(
+      "DELETE FROM product_images WHERE image_id = $1 AND product_id = $2",
+      [imageId, productId]
+    );
+    if (deleted.rowCount === 0) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+    res.json({ message: "Product image deleted successfully" });
+  } catch (err) {
+    console.error("Delete product image error:", err.message);
+    res.status(500).json({ error: err.message || "Error deleting product image" });
   }
 });
 

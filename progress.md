@@ -1,8 +1,33 @@
 # Bhumitra CFE — implementation progress
 
-Last updated: 2026-04-08
+Last updated: 2026-05-13
 
-## Added (this iteration)
+## Added (this iteration — 2026-05-13)
+
+### Expanded product tile overlay (Frontend)
+
+- **Clicking a product tile** now opens an expanded overlay centered on the page with a translucent backdrop (click outside or press Escape to close).
+- **Image carousel** inside the expanded tile: left/right arrow buttons navigate between images (arrows only shown when 2+ images exist), with dot indicators.
+- **Expanded tile layout:** Image carousel → Price → Description → purchase contact note (*For purchase, please contact us on WhatsApp/Instagram*).
+- **Placeholder contact info:** WhatsApp number and Instagram handle are placeholder text (`[mobile number]` / `[instagram handle]`) — admin should update in `ProductCatalog.js`.
+- **UI Polish:** Widened the expanded product tile to `70vw` and updated image `object-fit` to `contain` so the entire image is comfortably visible without cropping. Fixed ESLint `img-redundant-alt` warning.
+
+### Multi-image products (Full stack)
+
+- **Database:** New `product_images` table (`003_product_images.sql` migration) with FK to `products` (ON DELETE CASCADE), `sort_order` for ordering. Existing single `image` values are automatically migrated on first run.
+- **Backend API:**
+  - `GET /products` now returns an `images` array (from `product_images`) on each product.
+  - `POST /products` and `PUT /products/:id` accept an `images` array in addition to `image`; images are synced to `product_images`.
+  - New routes: `POST /products/:id/images` (add single image), `DELETE /products/:productId/images/:imageId` (remove single image).
+- **Admin Dashboard:**
+  - Product form now supports multiple image uploads (file picker accepts multiple files).
+  - "Add image by URL" input with Add button (or Enter key).
+  - Thumbnail preview grid of all added images with individual remove (×) buttons.
+  - Admin product cards show image count badge when > 1 image.
+
+---
+
+## Added (previous iteration — 2026-04-08)
 
 ### Frontend (`client/`)
 
@@ -37,6 +62,7 @@ Last updated: 2026-04-08
 
 - **Security:** Rate limiting on `/admin/login` and `/register`; optional CAPTCHA; move to proper JWT refresh or HTTP-only cookies.
 - **Media:** Cloud storage (S3, Supabase Storage) instead of base64 in Postgres; image size limits and cleanup on delete.
+- **Blog multi-image:** Add a `blog_images` table (similar to `product_images`) so blogs can have multiple images with a carousel.
 - **DB:** Optional indexes-only migration for heavy tables; backup automation documented per host.
 - **Product:** Search, pagination for long lists, blog comments, email notifications on registration.
 - **DevOps:** Dockerfile, CI (lint + build), health check used by orchestrators beyond `/test-db`.
