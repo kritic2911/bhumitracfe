@@ -92,6 +92,12 @@ const AboutContact = ({ theme }) => {
                     <br />
                     201301
                   </p>
+                  <h3 className="h6 text-uppercase small" style={{ color: theme.primary }}>
+                    Instagram Handle
+                  </h3> 
+                  <p className="mb-3" style={{ color: theme.muted }}>
+                    @bhumitra_
+                  </p>
                 </div>
                 <div className="col-md-6">
                   <h3 className="h6 text-uppercase small" style={{ color: theme.primary }}>
