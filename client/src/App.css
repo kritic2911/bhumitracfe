@@ -170,7 +170,7 @@ textarea::placeholder,
 }
 
 .blog-reader {
-  max-width: 860px;
+  max-width: 1200px;
   margin: 0 auto 2rem;
   border-radius: 18px;
   padding: 1.35rem 1.35rem 2rem;
@@ -186,7 +186,7 @@ textarea::placeholder,
 }
 
 .blog-reader-header {
-  max-width: 680px;
+  max-width: 1000px;
   margin: 0 auto 1rem;
 }
 
@@ -211,8 +211,7 @@ textarea::placeholder,
 
 .blog-reader-image {
   width: 100%;
-  max-width: 760px;
-  height: min(420px, 52vw);
+  height: auto;
   object-fit: cover;
   display: block;
   margin: 1.15rem auto 1.5rem;
@@ -220,7 +219,7 @@ textarea::placeholder,
 }
 
 .blog-reader-content {
-  max-width: 680px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 

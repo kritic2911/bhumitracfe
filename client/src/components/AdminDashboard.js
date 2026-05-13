@@ -173,6 +173,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
       content: blog.content || "",
     });
     setShowBlogForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const editProduct = (product) => {
@@ -191,6 +192,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
       images: imgs,
     });
     setShowProductForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const deleteProduct = async (productId) => {
