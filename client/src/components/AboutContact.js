@@ -88,9 +88,7 @@ const AboutContact = ({ theme }) => {
                     Address
                   </h3>
                   <p className="mb-0" style={{ color: theme.muted }}>
-                    Noida sector-62
-                    <br />
-                    201301
+                    Noida sector-62, 201301
                   </p>
                   <h3 className="h6 text-uppercase small" style={{ color: theme.primary }}>
                     Instagram Handle
