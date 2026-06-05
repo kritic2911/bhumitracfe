@@ -156,10 +156,30 @@ This is one common pattern; adapt names to your provider.
 
 ## 8. Keepalive pings (Render + Supabase free tiers)
 
-If traffic is low, free-tier services may sleep and the first request can be slow.  
-This repo includes `.github/workflows/keepalive.yml` to ping your backend every 10 minutes.
+If traffic is low, free-tier services may sleep and the first request can be slow.
 
-### Enable it
+### Vercel Cron — Supabase keepalive (recommended for this frontend)
+
+The `client/` Vercel project includes a serverless function at `/api/keepalive` that runs `SELECT NOW()` against your Supabase Postgres. A cron in `client/vercel.json` calls it every 3 days (`0 0 */3 * *`), which stays within Supabase's free-tier inactivity window.
+
+**Vercel environment variables** (Project Settings → Environment Variables, for the `client/` project):
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | **Recommended.** Full Supabase Postgres connection string (same value as on Render). |
+| `DB_SSL` | Set to `true` for Supabase. |
+| `DB_SSL_REJECT_UNAUTHORIZED` | Set to `false` for Supabase. |
+
+Alternatively, instead of `DATABASE_URL`, set `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, and `DB_NAME` (same as `server/.env`).
+
+**Verify after deploy:**
+
+1. Open `https://<your-vercel-domain>/api/keepalive` — expect `{ "ok": true, "timestamp": "..." }`.
+2. In the Vercel dashboard → **Cron Jobs**, confirm the keepalive job is listed and check execution logs.
+
+### GitHub Actions — Render backend keepalive (optional)
+
+This repo also includes `.github/workflows/keepalive.yml` to ping your Render backend every 10 minutes.
 
 1. Push this repo to GitHub.
 2. In GitHub repo settings, add secret:
@@ -168,8 +188,8 @@ This repo includes `.github/workflows/keepalive.yml` to ping your backend every 
 4. Optionally run **Keepalive Ping** once via **Run workflow**.
 
 Notes:
-- This keeps your Render service and DB path warm more consistently, but free platforms can still sleep or throttle.
-- If you want truly always-on behavior, use paid plans.
+- Vercel Cron keeps Supabase warm; GitHub Actions keeps Render warm. Use one or both depending on your hosting.
+- Free platforms can still sleep or throttle; paid plans give more reliable uptime.
 
 ---
 
