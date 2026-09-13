@@ -208,6 +208,8 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
 
   // ── PDF export ────────────────────────────────────────────────────────────
   const exportPDF = () => {
+    const getAbsUrl = (path) => path && !path.startsWith('http') ? window.location.origin + (path.startsWith('/') ? '' : '/') + path : path;
+
     const sections = products.map((p) => {
       const variants = Array.isArray(p.variants) ? p.variants : [];
       const variantRows = variants.length
@@ -217,7 +219,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
               <td style="padding:6px 10px;border:1px solid #ddd">${formatPrice(v.price || p.price)}</td>
               <td style="padding:6px 10px;border:1px solid #ddd">${
                 v.image
-                  ? `<img src="${v.image}" style="max-width:160px;max-height:160px;object-fit:contain;display:block" />`
+                  ? `<img src="${getAbsUrl(v.image)}" style="max-width:160px;max-height:160px;object-fit:contain;display:block" />`
                   : "—"
               }</td>
             </tr>`
@@ -228,7 +230,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
         ? p.images.map((i) => (typeof i === "string" ? i : i.image))
         : p.image ? [p.image] : [];
       const allImgs = imgList.map((src) =>
-        `<img src="${src}" style="max-width:220px;max-height:220px;object-fit:contain;margin:6px;display:inline-block;vertical-align:top" />`
+        `<img src="${getAbsUrl(src)}" style="max-width:220px;max-height:220px;object-fit:contain;margin:6px;display:inline-block;vertical-align:top" />`
       ).join("") || "—";
 
       return `
@@ -248,7 +250,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
         </div>`;
     }).join("");
 
-    const html = `<!DOCTYPE html><html><head><title>Bhumitra Product Catalog</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bhumitra Product Catalog</title>
       <style>
         body { font-family: sans-serif; padding: 2rem; max-width: 900px; margin: 0 auto }
         h1   { color: #2d6a4f }
