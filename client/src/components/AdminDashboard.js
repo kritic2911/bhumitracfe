@@ -120,7 +120,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
       price:       product.price,
       description: product.description,
       images:      imgs,
-      variants:    Array.isArray(product.variants) ? product.variants : [],
+      variants:    (product.variants?.length ? product.variants : (product.quantities || [])).map(v => ({ ...v })),
     });
     setShowProductForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });

@@ -117,15 +117,27 @@ app.put("/users/:id", adminAuthMiddleware, async (req, res) => {
 app.get("/products", async (req, res) => {
   try {
     const allProducts = await pool.query("SELECT * FROM products ORDER BY product_id DESC");
-    const allImages = await pool.query("SELECT * FROM product_images ORDER BY product_id, sort_order");
-    const imagesByProduct = {};
+    const allImages   = await pool.query("SELECT * FROM product_images ORDER BY product_id, sort_order");
+    // Variants: gracefully skip if table doesn't exist yet
+    let allVariants = { rows: [] };
+    try {
+      allVariants = await pool.query("SELECT * FROM product_variants ORDER BY product_id, sort_order");
+    } catch (_) { /* table may not exist on first boot before migration */ }
+
+    const imagesByProduct   = {};
+    const variantsByProduct = {};
     for (const img of allImages.rows) {
       if (!imagesByProduct[img.product_id]) imagesByProduct[img.product_id] = [];
       imagesByProduct[img.product_id].push(img);
     }
+    for (const v of allVariants.rows) {
+      if (!variantsByProduct[v.product_id]) variantsByProduct[v.product_id] = [];
+      variantsByProduct[v.product_id].push(v);
+    }
     const rows = allProducts.rows.map((p) => ({
       ...p,
-      images: imagesByProduct[p.product_id] || [],
+      images:   imagesByProduct[p.product_id]   || [],
+      variants: variantsByProduct[p.product_id] || [],
     }));
     res.json(rows);
   } catch (err) {
@@ -136,7 +148,7 @@ app.get("/products", async (req, res) => {
 
 app.post("/products", adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, price, description, image, images } = req.body;
+    const { name, price, description, image, images, variants } = req.body;
     if (!name || !price || !description) {
       return res.status(400).json({ error: "Name, price, and description are required" });
     }
@@ -145,20 +157,28 @@ app.post("/products", adminAuthMiddleware, async (req, res) => {
       [name, price, description, image || null]
     );
     const productId = newProduct.rows[0].product_id;
-    // Insert images into product_images
+    // Insert product images
     const imgList = Array.isArray(images) && images.length > 0 ? images : (image ? [image] : []);
     for (let i = 0; i < imgList.length; i++) {
       await pool.query(
         "INSERT INTO product_images (product_id, image, sort_order) VALUES ($1, $2, $3)",
-        [productId, imgList[i], i]
+        [productId, typeof imgList[i] === "string" ? imgList[i] : imgList[i].image, i]
       );
     }
-    // Return product with images
-    const imgRows = await pool.query(
-      "SELECT * FROM product_images WHERE product_id = $1 ORDER BY sort_order",
-      [productId]
-    );
-    res.status(201).json({ ...newProduct.rows[0], images: imgRows.rows });
+    // Insert variants
+    if (Array.isArray(variants)) {
+      for (let i = 0; i < variants.length; i++) {
+        const v = variants[i];
+        if (!v.label) continue;
+        await pool.query(
+          "INSERT INTO product_variants (product_id, label, price, image, sort_order) VALUES ($1,$2,$3,$4,$5)",
+          [productId, v.label, v.price || null, v.image || null, i]
+        );
+      }
+    }
+    const imgRows     = await pool.query("SELECT * FROM product_images   WHERE product_id=$1 ORDER BY sort_order", [productId]);
+    const variantRows = await pool.query("SELECT * FROM product_variants WHERE product_id=$1 ORDER BY sort_order", [productId]);
+    res.status(201).json({ ...newProduct.rows[0], images: imgRows.rows, variants: variantRows.rows });
   } catch (err) {
     console.error("Create product error:", err.message);
     res.status(500).json({ error: err.message || "Error creating product" });
@@ -168,32 +188,42 @@ app.post("/products", adminAuthMiddleware, async (req, res) => {
 app.put("/products/:id", adminAuthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price, description, image, images } = req.body;
+    const { name, price, description, image, images, variants } = req.body;
     if (!name || !price || !description) {
       return res.status(400).json({ error: "Name, price, and description are required" });
     }
     const updatedProduct = await pool.query(
-      "UPDATE products SET name = $1, price = $2, description = $3, image = $4 WHERE product_id = $5 RETURNING *",
+      "UPDATE products SET name=$1, price=$2, description=$3, image=$4 WHERE product_id=$5 RETURNING *",
       [name, price, description, image || null, id]
     );
     if (updatedProduct.rows.length === 0) {
       return res.status(404).json({ error: "Product not found" });
     }
-    // If images array is provided, replace all product_images
+    // Replace images
     if (Array.isArray(images)) {
-      await pool.query("DELETE FROM product_images WHERE product_id = $1", [id]);
+      await pool.query("DELETE FROM product_images WHERE product_id=$1", [id]);
       for (let i = 0; i < images.length; i++) {
         await pool.query(
-          "INSERT INTO product_images (product_id, image, sort_order) VALUES ($1, $2, $3)",
-          [id, images[i], i]
+          "INSERT INTO product_images (product_id, image, sort_order) VALUES ($1,$2,$3)",
+          [id, typeof images[i] === "string" ? images[i] : images[i].image, i]
         );
       }
     }
-    const imgRows = await pool.query(
-      "SELECT * FROM product_images WHERE product_id = $1 ORDER BY sort_order",
-      [id]
-    );
-    res.json({ ...updatedProduct.rows[0], images: imgRows.rows });
+    // Replace variants
+    if (Array.isArray(variants)) {
+      await pool.query("DELETE FROM product_variants WHERE product_id=$1", [id]);
+      for (let i = 0; i < variants.length; i++) {
+        const v = variants[i];
+        if (!v.label) continue;
+        await pool.query(
+          "INSERT INTO product_variants (product_id, label, price, image, sort_order) VALUES ($1,$2,$3,$4,$5)",
+          [id, v.label, v.price || null, v.image || null, i]
+        );
+      }
+    }
+    const imgRows     = await pool.query("SELECT * FROM product_images   WHERE product_id=$1 ORDER BY sort_order", [id]);
+    const variantRows = await pool.query("SELECT * FROM product_variants WHERE product_id=$1 ORDER BY sort_order", [id]);
+    res.json({ ...updatedProduct.rows[0], images: imgRows.rows, variants: variantRows.rows });
   } catch (err) {
     console.error("Update product error:", err.message);
     res.status(500).json({ error: err.message || "Error updating product" });
@@ -212,6 +242,66 @@ app.delete("/products/:id", adminAuthMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Delete product error:", err.message);
     res.status(500).json({ error: err.message || "Error deleting product" });
+  }
+});
+
+// --- Product variants CRUD ---
+
+app.get("/products/:id/variants", async (req, res) => {
+  try {
+    const rows = await pool.query(
+      "SELECT * FROM product_variants WHERE product_id=$1 ORDER BY sort_order",
+      [req.params.id]
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/products/:id/variants", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { label, price, image, sort_order } = req.body;
+    if (!label) return res.status(400).json({ error: "label is required" });
+    const maxOrd = await pool.query(
+      "SELECT COALESCE(MAX(sort_order),-1) AS m FROM product_variants WHERE product_id=$1",
+      [req.params.id]
+    );
+    const ord = sort_order ?? maxOrd.rows[0].m + 1;
+    const row = await pool.query(
+      "INSERT INTO product_variants (product_id,label,price,image,sort_order) VALUES ($1,$2,$3,$4,$5) RETURNING *",
+      [req.params.id, label, price || null, image || null, ord]
+    );
+    res.status(201).json(row.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/products/:id/variants/:vid", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { label, price, image, sort_order } = req.body;
+    const row = await pool.query(
+      "UPDATE product_variants SET label=$1,price=$2,image=$3,sort_order=$4 WHERE variant_id=$5 AND product_id=$6 RETURNING *",
+      [label, price || null, image || null, sort_order ?? 0, req.params.vid, req.params.id]
+    );
+    if (!row.rows.length) return res.status(404).json({ error: "Variant not found" });
+    res.json(row.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/products/:id/variants/:vid", adminAuthMiddleware, async (req, res) => {
+  try {
+    const del = await pool.query(
+      "DELETE FROM product_variants WHERE variant_id=$1 AND product_id=$2",
+      [req.params.vid, req.params.id]
+    );
+    if (!del.rowCount) return res.status(404).json({ error: "Variant not found" });
+    res.json({ message: "Deleted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
