@@ -30,9 +30,15 @@ const ChevronRight = ({ size = 22 }) => (
   </svg>
 );
 
+const formatPrice = (p) => {
+  if (!p) return "";
+  const str = String(p);
+  return str.startsWith("₹") ? str : `₹${str}`;
+};
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const ProductCatalog = ({ theme, products: productsProp }) => {
+const ProductCatalog = ({ theme, products: productsProp, adminMode, onEdit, onDelete }) => {
   const defaults = [
     {
       product_id: 1, id: 1,
@@ -201,7 +207,7 @@ const ProductCatalog = ({ theme, products: productsProp }) => {
                   <div className="product-image-container">
                     <img src={thumb} className="product-image" alt="" />
                     <div className="price-tag" style={{ backgroundColor: theme.primary, color: btnText }}>
-                      {product.price}
+                      {formatPrice(product.price)}
                     </div>
                     {/* Variant badge */}
                     {((product.variants?.length || 0) + (product.quantities?.length || 0)) > 0 && (
@@ -213,6 +219,12 @@ const ProductCatalog = ({ theme, products: productsProp }) => {
                   <div className="card-body">
                     <h3 className="h6 card-title">{product.name}</h3>
                     <p className="card-text small mb-0" style={{ color: theme.muted }}>{product.description}</p>
+                    {adminMode && (
+                      <div className="d-flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="btn btn-sm rounded-pill btn-outline-secondary" onClick={() => onEdit && onEdit(product)}>Edit</button>
+                        <button type="button" className="btn btn-sm rounded-pill btn-outline-danger" onClick={() => onDelete && onDelete(pid(product))}>Delete</button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -300,7 +312,7 @@ const ProductCatalog = ({ theme, products: productsProp }) => {
             <div className="product-expanded-info">
               <h3 className="product-expanded-name">{selectedProduct.name}</h3>
               <p className="product-expanded-price" style={{ color: theme.primary }}>
-                {selectedQty?.price ? `${selectedQty.label}: ${selectedQty.price}` : `Price: ${selectedProduct.price}`}
+                {selectedQty?.price ? `${selectedQty.label}: ${formatPrice(selectedQty.price)}` : `Price: ${formatPrice(selectedProduct.price)}`}
               </p>
 
               {/* ── Quantity selector ── */}

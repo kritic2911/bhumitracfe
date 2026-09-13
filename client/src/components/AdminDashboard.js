@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { API_URL, adminHeaders } from "../api";
 import { themes } from "../themes";
 import ListUsers from "./listUsers";
+import ProductCatalog from "./ProductCatalog";
 import "./AdminDashboard.css";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -199,6 +200,12 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
   const iStyle  = { backgroundColor: theme.surface || theme.cardBackground, color: theme.text, borderColor: theme.borderColor };
   const surface = theme.surface || theme.cardBackground;
 
+  const formatPrice = (p) => {
+    if (!p) return "";
+    const str = String(p);
+    return str.startsWith("₹") ? str : `₹${str}`;
+  };
+
   // ── PDF export ────────────────────────────────────────────────────────────
   const exportPDF = () => {
     const sections = products.map((p) => {
@@ -207,7 +214,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
         ? variants.map((v) =>
             `<tr>
               <td style="padding:6px 10px;border:1px solid #ddd">${v.label}</td>
-              <td style="padding:6px 10px;border:1px solid #ddd">${v.price || p.price}</td>
+              <td style="padding:6px 10px;border:1px solid #ddd">${formatPrice(v.price || p.price)}</td>
               <td style="padding:6px 10px;border:1px solid #ddd">${
                 v.image
                   ? `<img src="${v.image}" style="max-width:160px;max-height:160px;object-fit:contain;display:block" />`
@@ -227,7 +234,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
       return `
         <div style="page-break-inside:avoid;margin-bottom:40px;border:1px solid #ccc;border-radius:8px;padding:20px">
           <h2 style="margin:0 0 4px;font-size:1.2rem">${p.name}</h2>
-          <p style="margin:0 0 12px;color:#2d6a4f;font-weight:600;font-size:1rem">${p.price}</p>
+          <p style="margin:0 0 12px;color:#2d6a4f;font-weight:600;font-size:1rem">${formatPrice(p.price)}</p>
           <p style="margin:0 0 12px;color:#555;font-size:0.9rem">${p.description}</p>
           <div style="margin-bottom:14px">${allImgs}</div>
           <table style="border-collapse:collapse;width:100%;font-size:0.88rem">
@@ -268,12 +275,12 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
     const rows = products.map((p) => {
       const variants = Array.isArray(p.variants) ? p.variants : [];
       const vtxt = variants.length
-        ? `"${variants.map((v) => v.label + (v.price ? ` (${v.price})` : "")).join("; ")}"`
+        ? `"${variants.map((v) => v.label + (v.price ? ` (${formatPrice(v.price)})` : "")).join("; ")}"`
         : "\"\"";
       const imgs = Array.isArray(p.images) && p.images.length
         ? `"${p.images.map((i) => (typeof i === "string" ? i : i.image)).join("; ")}"`
         : `"${p.image || ""}"`;
-      return `"${p.name.replace(/"/g, '""')}","${p.price}",${vtxt},${imgs}`;
+      return `"${p.name.replace(/"/g, '""')}","${formatPrice(p.price)}",${vtxt},${imgs}`;
     });
     const csv  = [header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -478,49 +485,15 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
             </div>
           )}
 
-          {/* product grid */}
-          <div className="row g-3 mb-3">
-            {products.map((product) => {
-              const thumb = (product.images?.length > 0
-                ? (typeof product.images[0] === "string" ? product.images[0] : product.images[0].image)
-                : product.image) || "/products/activator.jpg";
-              const variantCount = Array.isArray(product.variants) ? product.variants.length : 0;
-              return (
-                <div key={product.product_id ?? product.id} className="col-md-4">
-                  <div className="admin-product-card"
-                    style={{ backgroundColor: surface, border: `1px solid ${theme.borderColor}` }}>
-                    <div className="admin-product-img-wrap">
-                      <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      <span className="admin-product-price-badge"
-                        style={{ backgroundColor: theme.primary, color: btnColor }}>
-                        {product.price}
-                      </span>
-                      {variantCount > 0 && (
-                        <span className="admin-product-variant-badge">
-                          {variantCount} variant{variantCount !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </div>
-                    <div className="admin-product-body">
-                      <h4 className="admin-product-name">{product.name}</h4>
-                      <p className="admin-product-desc" style={{ color: theme.muted }}>
-                        {product.description}
-                      </p>
-                      <div className="d-flex gap-2">
-                        <button type="button" className="btn btn-sm rounded-pill btn-outline-secondary"
-                          onClick={() => editProduct(product)}>
-                          Edit
-                        </button>
-                        <button type="button" className="btn btn-sm rounded-pill btn-outline-danger"
-                          onClick={() => deleteProduct(product.product_id ?? product.id)}>
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          {/* product grid preview via ProductCatalog */}
+          <div className="mb-3">
+            <ProductCatalog
+              theme={theme}
+              products={products}
+              adminMode={true}
+              onEdit={editProduct}
+              onDelete={deleteProduct}
+            />
           </div>
 
           {/* export */}
