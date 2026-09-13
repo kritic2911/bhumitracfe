@@ -2,749 +2,651 @@ import React, { useState } from "react";
 import { API_URL, adminHeaders } from "../api";
 import { themes } from "../themes";
 import ListUsers from "./listUsers";
+import "./AdminDashboard.css";
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const TABS        = ["products", "blogs", "registrations"];
+const emptyProduct = { name: "", price: "", description: "", images: [], variants: [] };
+const emptyBlog    = { title: "", excerpt: "", image: "", content: "" };
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts }) => {
-  const [showBlogForm, setShowBlogForm] = useState(false);
-  const [showProductForm, setShowProductForm] = useState(false);
-  const [selectedBlog, setSelectedBlog] = useState(null);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [blogForm, setBlogForm] = useState({
-    title: "",
-    excerpt: "",
-    image: "",
-    content: "",
-  });
-  const [productForm, setProductForm] = useState({
-    name: "",
-    price: "",
-    description: "",
-    images: [],
-    quantities: [], // [{ label: "1 L", price: "", image: "" }]
-  });
+  const isDark   = theme === themes.dark;
+  const btnColor = isDark ? "#0a1610" : "#fffcf7";
+
+  // ── tab ──────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState("products");
+
+  // ── shared ───────────────────────────────────────────────────────────────
   const [statusMessage, setStatusMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]               = useState(false);
 
-  const resetBlogForm = () => {
-    setSelectedBlog(null);
-    setBlogForm({ title: "", excerpt: "", image: "", content: "" });
+  const showStatus = (msg) => {
+    setStatusMessage(msg);
+    window.setTimeout(() => setStatusMessage(""), 4000);
   };
 
-  const resetProductForm = () => {
-    setSelectedProduct(null);
-    setProductForm({ name: "", price: "", description: "", images: [], quantities: [] });
-  };
+  // ── product form state ────────────────────────────────────────────────────
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productForm, setProductForm]         = useState(emptyProduct);
 
-  // ── Quantity helpers ──
-  const addQuantityRow = () => {
-    setProductForm((prev) => ({
-      ...prev,
-      quantities: [...prev.quantities, { label: "", price: "", image: "" }],
-    }));
-  };
-
-  const updateQuantityRow = (idx, field, value) => {
-    setProductForm((prev) => ({
-      ...prev,
-      quantities: prev.quantities.map((q, i) => (i === idx ? { ...q, [field]: value } : q)),
-    }));
-  };
-
-  const removeQuantityRow = (idx) => {
-    setProductForm((prev) => ({
-      ...prev,
-      quantities: prev.quantities.filter((_, i) => i !== idx),
-    }));
-  };
-
-  const handleQuantityImageUpload = (idx, file) => {
-    const reader = new FileReader();
-    reader.onload = () => updateQuantityRow(idx, "image", reader.result);
-    reader.readAsDataURL(file);
-  };
-
-  const handleBlogChange = (field, value) => {
-    setBlogForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleBlogImageUpload = (file) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      setBlogForm((prev) => ({ ...prev, image: reader.result }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleProductChange = (field, value) => {
+  const resetProductForm = () => { setSelectedProduct(null); setProductForm(emptyProduct); };
+  const handleProductChange = (field, value) =>
     setProductForm((prev) => ({ ...prev, [field]: value }));
-  };
 
+  // images
   const handleProductImageUpload = (files) => {
     Array.from(files).forEach((file) => {
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = () =>
         setProductForm((prev) => ({ ...prev, images: [...prev.images, reader.result] }));
-      };
       reader.readAsDataURL(file);
     });
   };
-
-  const removeProductImage = (index) => {
-    setProductForm((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
-  };
-
+  const removeProductImage = (idx) =>
+    setProductForm((prev) => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
   const addProductImageUrl = (url) => {
     if (!url.trim()) return;
     setProductForm((prev) => ({ ...prev, images: [...prev.images, url.trim()] }));
   };
 
-  const showStatus = (message) => {
-    setStatusMessage(message);
-    window.setTimeout(() => setStatusMessage(""), 4000);
+  // variants (saved to product_variants DB table)
+  const addVariantRow = () =>
+    setProductForm((prev) => ({
+      ...prev,
+      variants: [...prev.variants, { label: "", price: "", image: "" }],
+    }));
+  const updateVariantRow = (idx, field, value) =>
+    setProductForm((prev) => ({
+      ...prev,
+      variants: prev.variants.map((v, i) => (i === idx ? { ...v, [field]: value } : v)),
+    }));
+  const removeVariantRow = (idx) =>
+    setProductForm((prev) => ({
+      ...prev,
+      variants: prev.variants.filter((_, i) => i !== idx),
+    }));
+  const handleVariantImageUpload = (idx, file) => {
+    const reader = new FileReader();
+    reader.onload = () => updateVariantRow(idx, "image", reader.result);
+    reader.readAsDataURL(file);
   };
 
-  const handleBlogSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!blogForm.title || !blogForm.content) {
-      alert("Title and content are required to publish a blog.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const payload = {
-        title: blogForm.title,
-        excerpt: blogForm.excerpt || `${blogForm.content.slice(0, 120)}...`,
-        image: blogForm.image || "/carousel/products.jpg",
-        content: blogForm.content,
-      };
-
-      const response = await fetch(
-        selectedBlog ? `${API_URL}/blogs/${selectedBlog.blog_id}` : `${API_URL}/blogs`,
-        {
-          method: selectedBlog ? "PUT" : "POST",
-          headers: adminHeaders(),
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Unable to save blog");
-      }
-
-      await refreshBlogs();
-      showStatus(selectedBlog ? "Blog updated successfully." : "Blog published successfully.");
-      resetBlogForm();
-      setShowBlogForm(false);
-    } catch (err) {
-      console.error(err);
-      alert(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
+  // ── product CRUD ──────────────────────────────────────────────────────────
   const handleProductSubmit = async (e) => {
     e.preventDefault();
-
     if (!productForm.name || !productForm.price || !productForm.description) {
-      alert("Name, price, and description are required for a product.");
+      alert("Name, price, and description are required.");
       return;
     }
-
     setSaving(true);
     try {
-      const imgList = productForm.images.length > 0 ? productForm.images : ["/products/activator.jpg"];
+      const imgList = productForm.images.length > 0
+        ? productForm.images
+        : ["/products/activator.jpg"];
       const payload = {
-        name: productForm.name,
-        price: productForm.price,
+        name:        productForm.name,
+        price:       productForm.price,
         description: productForm.description,
-        image: imgList[0],
-        images: imgList,
-        quantities: productForm.quantities.filter((q) => q.label.trim()),
+        image:       typeof imgList[0] === "string" ? imgList[0] : imgList[0].image,
+        images:      imgList,
+        variants:    productForm.variants.filter((v) => v.label.trim()),
       };
-
-      const response = await fetch(
-        selectedProduct ? `${API_URL}/products/${selectedProduct.product_id}` : `${API_URL}/products`,
-        {
-          method: selectedProduct ? "PUT" : "POST",
-          headers: adminHeaders(),
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Unable to save product");
-      }
-
+      const url    = selectedProduct
+        ? `${API_URL}/products/${selectedProduct.product_id}`
+        : `${API_URL}/products`;
+      const method = selectedProduct ? "PUT" : "POST";
+      const res    = await fetch(url, { method, headers: adminHeaders(), body: JSON.stringify(payload) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Save failed"); }
       await refreshProducts();
-      showStatus(selectedProduct ? "Product updated successfully." : "Product added successfully.");
+      showStatus(selectedProduct ? "Product updated." : "Product created.");
       resetProductForm();
       setShowProductForm(false);
-    } catch (err) {
-      console.error(err);
-      alert(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const editBlog = (blog) => {
-    setSelectedBlog(blog);
-    setBlogForm({
-      title: blog.title,
-      excerpt: blog.excerpt || "",
-      image: blog.image || "",
-      content: blog.content || "",
-    });
-    setShowBlogForm(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) { alert(err.message); }
+    finally { setSaving(false); }
   };
 
   const editProduct = (product) => {
     setSelectedProduct(product);
     let imgs = [];
-    if (product.images && product.images.length > 0) {
-      imgs = product.images.map((img) => (typeof img === "string" ? img : img.image));
-    } else if (product.image) {
-      imgs = [product.image];
-    }
+    if (product.images?.length > 0)
+      imgs = product.images.map((i) => (typeof i === "string" ? i : i.image));
+    else if (product.image) imgs = [product.image];
     setProductForm({
-      name: product.name,
-      price: product.price,
+      name:        product.name,
+      price:       product.price,
       description: product.description,
-      images: imgs,
-      quantities: Array.isArray(product.quantities) ? product.quantities : [],
+      images:      imgs,
+      variants:    Array.isArray(product.variants) ? product.variants : [],
     });
     setShowProductForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const deleteProduct = async (productId) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
-
+  const deleteProduct = async (id) => {
+    if (!window.confirm("Delete this product?")) return;
     try {
-      const response = await fetch(`${API_URL}/products/${productId}`, {
-        method: "DELETE",
-        headers: adminHeaders(),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Unable to delete product");
-      }
+      const res = await fetch(`${API_URL}/products/${id}`, { method: "DELETE", headers: adminHeaders() });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Delete failed"); }
       await refreshProducts();
-      showStatus("Product deleted successfully.");
-    } catch (err) {
-      console.error(err);
-      alert(err.message);
-    }
+      showStatus("Product deleted.");
+    } catch (err) { alert(err.message); }
   };
 
-  const deleteBlog = async (blogId) => {
-    if (!window.confirm("Delete this blog post?")) return;
+  // ── blog form state ───────────────────────────────────────────────────────
+  const [showBlogForm, setShowBlogForm] = useState(false);
+  const [selectedBlog, setSelectedBlog] = useState(null);
+  const [blogForm, setBlogForm]         = useState(emptyBlog);
 
+  const resetBlogForm   = () => { setSelectedBlog(null); setBlogForm(emptyBlog); };
+  const handleBlogChange = (field, value) => setBlogForm((prev) => ({ ...prev, [field]: value }));
+  const handleBlogImageUpload = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => setBlogForm((prev) => ({ ...prev, image: reader.result }));
+    reader.readAsDataURL(file);
+  };
+
+  // ── blog CRUD ─────────────────────────────────────────────────────────────
+  const handleBlogSubmit = async (e) => {
+    e.preventDefault();
+    if (!blogForm.title || !blogForm.content) { alert("Title and content are required."); return; }
+    setSaving(true);
     try {
-      const response = await fetch(`${API_URL}/blogs/${blogId}`, {
-        method: "DELETE",
-        headers: adminHeaders(),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Unable to delete blog");
-      }
+      const payload = {
+        title:   blogForm.title,
+        excerpt: blogForm.excerpt || `${blogForm.content.slice(0, 120)}...`,
+        image:   blogForm.image || "/carousel/products.jpg",
+        content: blogForm.content,
+      };
+      const url    = selectedBlog ? `${API_URL}/blogs/${selectedBlog.blog_id}` : `${API_URL}/blogs`;
+      const method = selectedBlog ? "PUT" : "POST";
+      const res    = await fetch(url, { method, headers: adminHeaders(), body: JSON.stringify(payload) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Save failed"); }
       await refreshBlogs();
-      showStatus("Blog deleted successfully.");
-    } catch (err) {
-      console.error(err);
-      alert(err.message);
-    }
+      showStatus(selectedBlog ? "Blog updated." : "Blog published.");
+      resetBlogForm();
+      setShowBlogForm(false);
+    } catch (err) { alert(err.message); }
+    finally { setSaving(false); }
   };
 
-  const inputStyle = {
-    backgroundColor: theme.surface || theme.cardBackground,
-    color: theme.text,
-    borderColor: theme.borderColor,
+  const editBlog = (blog) => {
+    setSelectedBlog(blog);
+    setBlogForm({
+      title:   blog.title,
+      excerpt: blog.excerpt  || "",
+      image:   blog.image    || "",
+      content: blog.content  || "",
+    });
+    setShowBlogForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const deleteBlog = async (id) => {
+    if (!window.confirm("Delete this blog post?")) return;
+    try {
+      const res = await fetch(`${API_URL}/blogs/${id}`, { method: "DELETE", headers: adminHeaders() });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Delete failed"); }
+      await refreshBlogs();
+      showStatus("Blog deleted.");
+    } catch (err) { alert(err.message); }
+  };
+
+  // ── shared input style ────────────────────────────────────────────────────
+  const iStyle  = { backgroundColor: theme.surface || theme.cardBackground, color: theme.text, borderColor: theme.borderColor };
+  const surface = theme.surface || theme.cardBackground;
+
+  // ── PDF export ────────────────────────────────────────────────────────────
+  const exportPDF = () => {
+    const sections = products.map((p) => {
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      const variantRows = variants.length
+        ? variants.map((v) =>
+            `<tr>
+              <td style="padding:6px 10px;border:1px solid #ddd">${v.label}</td>
+              <td style="padding:6px 10px;border:1px solid #ddd">${v.price || p.price}</td>
+              <td style="padding:6px 10px;border:1px solid #ddd">${
+                v.image
+                  ? `<img src="${v.image}" style="max-width:160px;max-height:160px;object-fit:contain;display:block" />`
+                  : "—"
+              }</td>
+            </tr>`
+          ).join("")
+        : `<tr><td colspan="3" style="padding:6px 10px;border:1px solid #ddd;color:#888">No variants defined</td></tr>`;
+
+      const imgList = Array.isArray(p.images) && p.images.length
+        ? p.images.map((i) => (typeof i === "string" ? i : i.image))
+        : p.image ? [p.image] : [];
+      const allImgs = imgList.map((src) =>
+        `<img src="${src}" style="max-width:220px;max-height:220px;object-fit:contain;margin:6px;display:inline-block;vertical-align:top" />`
+      ).join("") || "—";
+
+      return `
+        <div style="page-break-inside:avoid;margin-bottom:40px;border:1px solid #ccc;border-radius:8px;padding:20px">
+          <h2 style="margin:0 0 4px;font-size:1.2rem">${p.name}</h2>
+          <p style="margin:0 0 12px;color:#2d6a4f;font-weight:600;font-size:1rem">${p.price}</p>
+          <p style="margin:0 0 12px;color:#555;font-size:0.9rem">${p.description}</p>
+          <div style="margin-bottom:14px">${allImgs}</div>
+          <table style="border-collapse:collapse;width:100%;font-size:0.88rem">
+            <thead><tr style="background:#2d6a4f;color:#fff">
+              <th style="padding:7px 10px;text-align:left">Size / Variant</th>
+              <th style="padding:7px 10px;text-align:left">Price</th>
+              <th style="padding:7px 10px;text-align:left">Packaging</th>
+            </tr></thead>
+            <tbody>${variantRows}</tbody>
+          </table>
+        </div>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><title>Bhumitra Product Catalog</title>
+      <style>
+        body { font-family: sans-serif; padding: 2rem; max-width: 900px; margin: 0 auto }
+        h1   { color: #2d6a4f }
+        @media print { .no-print { display: none } body { padding: 1rem } }
+      </style></head><body>
+      <h1>Bhumitra Product Catalog</h1>
+      <button class="no-print" onclick="window.print()"
+        style="margin-bottom:1.5rem;padding:0.5rem 1.2rem;background:#2d6a4f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:1rem">
+        🖨 Print / Save as PDF
+      </button>
+      ${sections}
+    </body></html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+  };
+
+  const exportCSV = () => {
+    const header = "Product Name,Price,Variants,Image URLs";
+    const rows = products.map((p) => {
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      const vtxt = variants.length
+        ? `"${variants.map((v) => v.label + (v.price ? ` (${v.price})` : "")).join("; ")}"`
+        : "\"\"";
+      const imgs = Array.isArray(p.images) && p.images.length
+        ? `"${p.images.map((i) => (typeof i === "string" ? i : i.image)).join("; ")}"`
+        : `"${p.image || ""}"`;
+      return `"${p.name.replace(/"/g, '""')}","${p.price}",${vtxt},${imgs}`;
+    });
+    const csv  = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = "bhumitra_catalog.csv";
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="container py-5">
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+    <div className="container py-4">
+
+      {/* Header */}
+      <div className="admin-header mb-4">
         <div>
           <h2 className="h4 mb-1">Admin</h2>
           <p className="small mb-0" style={{ color: theme.muted }}>
-            Manage registrations (via user list route), products, and blog posts.
+            Manage products, blog posts, and registrations.
           </p>
-        </div>
-        <div className="d-flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn btn-sm rounded-pill px-3"
-            style={{ backgroundColor: theme.primary, color: theme === themes.dark ? "#0a1610" : "#fffcf7", border: "none" }}
-            onClick={() => {
-              setShowBlogForm((prev) => !prev);
-              resetBlogForm();
-            }}
-          >
-            {showBlogForm ? "Close blog form" : selectedBlog ? "Edit blog" : "Add blog"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm rounded-pill px-3 outline"
-            style={{
-              borderColor: theme.borderColor,
-              color: theme.text,
-              background: "transparent",
-            }}
-            onClick={() => {
-              setShowProductForm((prev) => !prev);
-              resetProductForm();
-            }}
-          >
-            {showProductForm ? "Close product form" : selectedProduct ? "Edit product" : "Add product"}
-          </button>
         </div>
       </div>
 
+      {/* Status banner */}
       {statusMessage && (
-        <div className="alert py-2 px-3 mb-4 rounded-3 border-0" style={{ backgroundColor: theme.accentWash, color: theme.primary }}>
+        <div className="alert py-2 px-3 mb-3 rounded-3 border-0"
+          style={{ backgroundColor: theme.accentWash, color: theme.primary }}>
           {statusMessage}
         </div>
       )}
 
-      {showBlogForm && (
-        <div
-          className="card border-0 rounded-4 mb-4 p-4 admin-blog-form"
-          style={{ backgroundColor: theme.surface || theme.cardBackground, color: theme.text, border: `1px solid ${theme.borderColor}` }}
-        >
-          <h3 className="h5 mb-3">{selectedBlog ? "Update blog post" : "New blog post"}</h3>
-          <form onSubmit={handleBlogSubmit}>
-            <div className="mb-3">
-              <label className="form-label small">Title</label>
-              <input
-                type="text"
-                className="form-control rounded-3"
-                value={blogForm.title}
-                onChange={(e) => handleBlogChange("title", e.target.value)}
-                style={inputStyle}
-                placeholder="Enter blog title"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label small">Featured image (file)</label>
-              <input
-                type="file"
-                accept="image/*"
-                className="form-control rounded-3"
-                onChange={(e) => e.target.files[0] && handleBlogImageUpload(e.target.files[0])}
-                style={inputStyle}
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label small">Or image URL</label>
-              <input
-                type="text"
-                className="form-control rounded-3"
-                value={blogForm.image}
-                onChange={(e) => handleBlogChange("image", e.target.value)}
-                style={inputStyle}
-                placeholder="Paste image URL (optional)"
-              />
-            </div>
-            {blogForm.image && (
-              <div className="mb-3">
-                <img src={blogForm.image} alt="" className="img-fluid rounded-3" style={{ maxHeight: "240px" }} />
-              </div>
-            )}
-            <div className="mb-3">
-              <label className="form-label small">Excerpt</label>
-              <textarea
-                className="form-control rounded-3"
-                rows="3"
-                value={blogForm.excerpt}
-                onChange={(e) => handleBlogChange("excerpt", e.target.value)}
-                style={inputStyle}
-                placeholder="Short excerpt for the blog card"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label small">Content</label>
-              <textarea
-                className="form-control rounded-3 blog-editor-textarea"
-                rows="8"
-                value={blogForm.content}
-                onChange={(e) => handleBlogChange("content", e.target.value)}
-                style={inputStyle}
-                placeholder="Write your blog post here..."
-              />
-            </div>
+      {/* Tabs */}
+      <div className="admin-tabs mb-4">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            className={`admin-tab-btn${activeTab === tab ? " admin-tab-btn--active" : ""}`}
+            style={activeTab === tab
+              ? { backgroundColor: theme.primary, color: btnColor, borderColor: theme.primary }
+              : { backgroundColor: "transparent", color: theme.text, borderColor: theme.borderColor }}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab === "products" ? "📦 Products" : tab === "blogs" ? "📝 Blog posts" : "👥 Registrations"}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══════════════════ PRODUCTS TAB ═══════════════════ */}
+      {activeTab === "products" && (
+        <div>
+          {/* toolbar */}
+          <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h3 className="h5 mb-0">Products ({products.length})</h3>
             <button
-              type="submit"
-              className="btn rounded-pill px-4"
-              disabled={saving}
-              style={{ backgroundColor: theme.primary, color: theme === themes.dark ? "#0a1610" : "#fffcf7", border: "none" }}
+              type="button"
+              className="btn btn-sm rounded-pill px-3"
+              style={{ backgroundColor: theme.primary, color: btnColor, border: "none" }}
+              onClick={() => { setShowProductForm((p) => !p); resetProductForm(); }}
             >
-              {saving ? "Saving…" : selectedBlog ? "Save changes" : "Publish"}
+              {showProductForm ? "✕ Close form" : "+ Add product"}
             </button>
-          </form>
-        </div>
-      )}
+          </div>
 
-      {showProductForm && (
-        <div
-          className="card border-0 rounded-4 mb-4 p-4"
-          style={{ backgroundColor: theme.surface || theme.cardBackground, color: theme.text, border: `1px solid ${theme.borderColor}` }}
-        >
-          <h3 className="h5 mb-3">{selectedProduct ? "Update product" : "New product"}</h3>
-          <form onSubmit={handleProductSubmit}>
-            <div className="mb-3">
-              <label className="form-label small">Name</label>
-              <input
-                type="text"
-                className="form-control rounded-3"
-                value={productForm.name}
-                onChange={(e) => handleProductChange("name", e.target.value)}
-                style={inputStyle}
-                placeholder="Product name"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label small">Price</label>
-              <input
-                type="text"
-                className="form-control rounded-3"
-                value={productForm.price}
-                onChange={(e) => handleProductChange("price", e.target.value)}
-                style={inputStyle}
-                placeholder="₹199/L or ₹49-69"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label small">Description</label>
-              <textarea
-                className="form-control rounded-3"
-                rows="3"
-                value={productForm.description}
-                onChange={(e) => handleProductChange("description", e.target.value)}
-                style={inputStyle}
-                placeholder="Product description"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label small">Product images (files)</label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="form-control rounded-3"
-                onChange={(e) => e.target.files.length > 0 && handleProductImageUpload(e.target.files)}
-                style={inputStyle}
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label small">Or add image by URL</label>
-              <div className="d-flex gap-2">
-                <input
-                  type="text"
-                  className="form-control rounded-3"
-                  id="product-image-url-input"
-                  style={inputStyle}
-                  placeholder="Paste image URL and click Add"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addProductImageUrl(e.target.value);
-                      e.target.value = "";
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-sm rounded-pill px-3"
-                  style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent", whiteSpace: "nowrap" }}
-                  onClick={() => {
-                    const input = document.getElementById("product-image-url-input");
-                    if (input) {
-                      addProductImageUrl(input.value);
-                      input.value = "";
-                    }
-                  }}
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-            {productForm.images.length > 0 && (
-              <div className="mb-3">
-                <label className="form-label small">Image previews ({productForm.images.length})</label>
-                <div className="d-flex flex-wrap gap-2">
-                  {productForm.images.map((img, idx) => (
-                    <div key={idx} className="position-relative" style={{ width: "90px", height: "90px" }}>
-                      <img
-                        src={img}
-                        alt=""
-                        className="rounded-3"
-                        style={{ width: "100%", height: "100%", objectFit: "cover", border: `1px solid ${theme.borderColor}` }}
-                      />
-                      <button
-                        type="button"
-                        className="position-absolute top-0 end-0 border-0 rounded-circle d-flex align-items-center justify-content-center"
-                        style={{
-                          width: "20px",
-                          height: "20px",
-                          fontSize: "0.65rem",
-                          backgroundColor: "rgba(200,50,50,0.85)",
-                          color: "#fff",
-                          transform: "translate(30%, -30%)",
-                          cursor: "pointer",
-                          lineHeight: 1,
-                        }}
-                        onClick={() => removeProductImage(idx)}
-                        aria-label={`Remove image ${idx + 1}`}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* ── Quantities ── */}
-            <div className="mb-3">
-              <label className="form-label small fw-semibold">Quantities / sizes (optional)</label>
-              <p className="small mb-2" style={{ color: theme.muted }}>
-                Add size options (e.g. 1 L, 5 L). Each can have its own price and a packaging photo.
-              </p>
-              {productForm.quantities.map((qty, idx) => (
-                <div key={idx} className="d-flex gap-2 align-items-start mb-2 flex-wrap">
-                  <input
-                    type="text"
-                    className="form-control rounded-3"
-                    style={{ ...inputStyle, maxWidth: "100px" }}
-                    placeholder="Label (e.g. 1 L)"
-                    value={qty.label}
-                    onChange={(e) => updateQuantityRow(idx, "label", e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    className="form-control rounded-3"
-                    style={{ ...inputStyle, maxWidth: "100px" }}
-                    placeholder="Price (opt.)"
-                    value={qty.price}
-                    onChange={(e) => updateQuantityRow(idx, "price", e.target.value)}
-                  />
-                  <div className="d-flex flex-column gap-1" style={{ flex: 1 }}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="form-control rounded-3"
-                      style={inputStyle}
-                      onChange={(e) => e.target.files[0] && handleQuantityImageUpload(idx, e.target.files[0])}
-                    />
-                    {qty.image && (
-                      <img src={qty.image} alt="" className="rounded-2"
-                        style={{ height: "48px", width: "72px", objectFit: "cover", border: `1px solid ${theme.borderColor}` }} />
-                    )}
-                    <input
-                      type="text"
-                      className="form-control rounded-3"
-                      style={inputStyle}
-                      placeholder="Or paste packaging image URL"
-                      value={qty.image && !qty.image.startsWith("data:") ? qty.image : ""}
-                      onChange={(e) => updateQuantityRow(idx, "image", e.target.value)}
-                    />
+          {/* product form */}
+          {showProductForm && (
+            <div className="admin-form-card mb-4"
+              style={{ backgroundColor: surface, border: `1px solid ${theme.borderColor}` }}>
+              <h4 className="admin-form-title">
+                {selectedProduct ? "Edit product" : "New product"}
+              </h4>
+              <form onSubmit={handleProductSubmit}>
+
+                <div className="admin-form-row">
+                  <div className="admin-form-group">
+                    <label className="form-label small">Product name *</label>
+                    <input type="text" className="form-control rounded-3" style={iStyle}
+                      value={productForm.name} placeholder="e.g. Bhumizyme"
+                      onChange={(e) => handleProductChange("name", e.target.value)} />
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-danger rounded-pill"
-                    onClick={() => removeQuantityRow(idx)}
-                    style={{ whiteSpace: "nowrap", alignSelf: "flex-start" }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="btn btn-sm rounded-pill"
-                style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
-                onClick={addQuantityRow}
-              >
-                + Add size / quantity
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              className="btn rounded-pill px-4"
-              disabled={saving}
-              style={{ backgroundColor: theme.primary, color: theme === themes.dark ? "#0a1610" : "#fffcf7", border: "none" }}
-            >
-              {saving ? "Saving…" : selectedProduct ? "Save product" : "Create product"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      <div className="mb-5">
-        <h3 className="h5 mb-3">Products</h3>
-        <div className="row g-3">
-          {products.map((product) => (
-            <div key={product.product_id ?? product.id} className="col-md-4">
-              <div
-                className="card h-100 border-0 rounded-4 overflow-hidden"
-                style={{ backgroundColor: theme.surface || theme.cardBackground, border: `1px solid ${theme.borderColor}` }}
-              >
-                <div className="position-relative">
-                  <img src={
-                    (product.images && product.images.length > 0
-                      ? (typeof product.images[0] === "string" ? product.images[0] : product.images[0].image)
-                      : product.image) || "/products/activator.jpg"
-                  } alt="" className="w-100" style={{ objectFit: "cover", height: "200px" }} />
-                  <div
-                    className="position-absolute top-0 end-0 m-2 px-2 py-1 rounded-pill small fw-semibold"
-                    style={{
-                      backgroundColor: theme.primary,
-                      color: theme === themes.dark ? "#0a1610" : "#fffcf7",
-                    }}
-                  >
-                    {product.price}
+                  <div className="admin-form-group admin-form-group--sm">
+                    <label className="form-label small">Base price *</label>
+                    <input type="text" className="form-control rounded-3" style={iStyle}
+                      value={productForm.price} placeholder="₹199/L"
+                      onChange={(e) => handleProductChange("price", e.target.value)} />
                   </div>
-                  {product.images && product.images.length > 1 && (
-                    <div
-                      className="position-absolute bottom-0 start-0 m-2 px-2 py-1 rounded-pill small fw-semibold"
-                      style={{
-                        backgroundColor: "rgba(0,0,0,0.55)",
-                        color: "#fff",
-                        fontSize: "0.72rem",
-                      }}
-                    >
-                      {product.images.length} images
+                </div>
+
+                <div className="admin-form-group mb-3">
+                  <label className="form-label small">Description *</label>
+                  <textarea className="form-control rounded-3" rows="3" style={iStyle}
+                    value={productForm.description} placeholder="Product description"
+                    onChange={(e) => handleProductChange("description", e.target.value)} />
+                </div>
+
+                {/* images */}
+                <div className="admin-form-group mb-3">
+                  <label className="form-label small">Product images</label>
+                  <input type="file" accept="image/*" multiple
+                    className="form-control rounded-3 mb-2" style={iStyle}
+                    onChange={(e) => e.target.files.length && handleProductImageUpload(e.target.files)} />
+                  <div className="d-flex gap-2 mb-2">
+                    <input type="text" className="form-control rounded-3" style={iStyle}
+                      id="prod-img-url" placeholder="Or paste image URL"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addProductImageUrl(e.target.value);
+                          e.target.value = "";
+                        }
+                      }} />
+                    <button type="button" className="btn btn-sm rounded-pill px-3"
+                      style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent", whiteSpace: "nowrap" }}
+                      onClick={() => {
+                        const el = document.getElementById("prod-img-url");
+                        if (el) { addProductImageUrl(el.value); el.value = ""; }
+                      }}>
+                      Add
+                    </button>
+                  </div>
+                  {productForm.images.length > 0 && (
+                    <div className="d-flex flex-wrap gap-2">
+                      {productForm.images.map((img, i) => (
+                        <div key={i} className="position-relative" style={{ width: 80, height: 80 }}>
+                          <img src={img} alt="" className="rounded-3"
+                            style={{ width: "100%", height: "100%", objectFit: "cover", border: `1px solid ${theme.borderColor}` }} />
+                          <button type="button" onClick={() => removeProductImage(i)} aria-label="Remove"
+                            className="position-absolute top-0 end-0 border-0 rounded-circle d-flex align-items-center justify-content-center"
+                            style={{ width: 18, height: 18, fontSize: "0.6rem", background: "rgba(200,50,50,0.85)", color: "#fff", transform: "translate(30%,-30%)", cursor: "pointer", lineHeight: 1 }}>
+                            ✕
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-                <div className="card-body">
-                  <h4 className="h6">{product.name}</h4>
-                  <p className="small" style={{ color: theme.muted }}>
-                    {product.description}
-                  </p>
-                  <div className="d-flex gap-2">
-                    <button type="button" className="btn btn-sm rounded-pill btn-outline-secondary" onClick={() => editProduct(product)}>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm rounded-pill btn-outline-danger"
-                      onClick={() => deleteProduct(product.product_id ?? product.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
 
-        {/* ── Export panel ── */}
-        <div className="d-flex align-items-center gap-3 mt-3 flex-wrap">
-          <span className="small fw-semibold" style={{ color: theme.muted }}>Export catalog:</span>
-          <button
-            type="button"
-            className="btn btn-sm rounded-pill"
-            style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
-            onClick={() => {
-              // Build a printable HTML page and open it
-              const rows = products.map((p) => {
-                const qtys = Array.isArray(p.quantities) && p.quantities.length
-                  ? p.quantities.map((q) => q.label + (q.price ? ` (${q.price})` : "")).join(", ")
-                  : "—";
-                const imgs = Array.isArray(p.images) && p.images.length
-                  ? p.images.map((img) => `<img src="${ typeof img === "string" ? img : img.image }" style="height:60px;width:80px;object-fit:cover;border-radius:4px;margin:2px" />`).join("")
-                  : (p.image ? `<img src="${p.image}" style="height:60px;width:80px;object-fit:cover;border-radius:4px" />` : "—");
-                return `<tr><td style="padding:10px;border:1px solid #ddd">${p.name}</td><td style="padding:10px;border:1px solid #ddd">${qtys}</td><td style="padding:10px;border:1px solid #ddd">${imgs}</td><td style="padding:10px;border:1px solid #ddd;font-weight:600">${p.price}</td></tr>`;
-              }).join("");
-              const html = `<!DOCTYPE html><html><head><title>Bhumitra Product Catalog</title><style>body{font-family:sans-serif;padding:2rem}table{border-collapse:collapse;width:100%}th{background:#2d6a4f;color:#fff;padding:10px;border:1px solid #ddd}@media print{button{display:none}}</style></head><body><h2>Bhumitra Product Catalog</h2><button onclick="window.print()">Print / Save as PDF</button><br/><br/><table><thead><tr><th>Product</th><th>Quantities</th><th>Images</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
-              const win = window.open("", "_blank");
-              win.document.write(html);
-              win.document.close();
-            }}
-          >
-            📄 Export PDF
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm rounded-pill"
-            style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
-            onClick={() => {
-              const header = "Product Name,Quantities,Image URLs,Price";
-              const rows = products.map((p) => {
-                const qtys = Array.isArray(p.quantities) && p.quantities.length
-                  ? `"${p.quantities.map((q) => q.label + (q.price ? ` (${q.price})` : "")).join("; ")}"`
-                  : "";
-                const imgs = Array.isArray(p.images) && p.images.length
-                  ? `"${p.images.map((img) => (typeof img === "string" ? img : img.image)).join("; ")}"`
-                  : `"${p.image || ""}"`;
-                return `"${p.name.replace(/"/g, '""')}",${qtys},${imgs},"${p.price}"`;
-              });
-              const csv = [header, ...rows].join("\n");
-              const blob = new Blob([csv], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url; a.download = "bhumitra_catalog.csv";
-              a.click(); URL.revokeObjectURL(url);
-            }}
-          >
-            📊 Export Excel (CSV)
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <h3 className="h5 mb-3">Blog posts</h3>
-        <div className="row g-3">
-          {blogs.map((blog) => (
-            <div key={blog.blog_id ?? blog.id} className="col-md-6">
-              <div
-                className="card h-100 border-0 rounded-4 overflow-hidden"
-                style={{ backgroundColor: theme.surface || theme.cardBackground, border: `1px solid ${theme.borderColor}` }}
-              >
-                <img src={blog.image} alt="" className="w-100" style={{ objectFit: "cover", height: "200px" }} />
-                <div className="card-body">
-                  <h4 className="h6">{blog.title}</h4>
+                {/* variants → saved to product_variants table */}
+                <div className="admin-form-group mb-3">
+                  <label className="form-label small fw-semibold">Sizes / Variants</label>
                   <p className="small mb-2" style={{ color: theme.muted }}>
-                    {blog.excerpt}
+                    Add size options (e.g. 1 L, 5 L). Each has its own price and a packaging photo
+                    shown to customers when they select that size.
                   </p>
-                  <div className="d-flex gap-2">
-                    <button type="button" className="btn btn-sm rounded-pill btn-outline-secondary" onClick={() => editBlog(blog)}>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm rounded-pill btn-outline-danger"
-                      onClick={() => deleteBlog(blog.blog_id ?? blog.id)}
-                    >
-                      Delete
-                    </button>
+                  {productForm.variants.map((v, idx) => (
+                    <div key={idx} className="admin-variant-row mb-2"
+                      style={{ backgroundColor: theme.background || theme.cardBackground, border: `1px solid ${theme.borderColor}` }}>
+                      <div className="admin-variant-fields">
+                        <div>
+                          <label className="form-label small mb-1">Label *</label>
+                          <input type="text" className="form-control form-control-sm rounded-3" style={iStyle}
+                            placeholder="1 L" value={v.label}
+                            onChange={(e) => updateVariantRow(idx, "label", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="form-label small mb-1">Price</label>
+                          <input type="text" className="form-control form-control-sm rounded-3" style={iStyle}
+                            placeholder="₹199" value={v.price}
+                            onChange={(e) => updateVariantRow(idx, "price", e.target.value)} />
+                        </div>
+                        <div style={{ flex: 2 }}>
+                          <label className="form-label small mb-1">Packaging image</label>
+                          <input type="file" accept="image/*"
+                            className="form-control form-control-sm rounded-3 mb-1" style={iStyle}
+                            onChange={(e) => e.target.files[0] && handleVariantImageUpload(idx, e.target.files[0])} />
+                          <input type="text" className="form-control form-control-sm rounded-3" style={iStyle}
+                            placeholder="Or paste image URL"
+                            value={v.image && !v.image.startsWith("data:") ? v.image : ""}
+                            onChange={(e) => updateVariantRow(idx, "image", e.target.value)} />
+                        </div>
+                        {v.image && (
+                          <img src={v.image} alt=""
+                            style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: `1px solid ${theme.borderColor}`, alignSelf: "flex-end" }} />
+                        )}
+                      </div>
+                      <button type="button"
+                        className="admin-variant-remove btn btn-sm btn-outline-danger rounded-pill mt-1"
+                        onClick={() => removeVariantRow(idx)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className="btn btn-sm rounded-pill"
+                    style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
+                    onClick={addVariantRow}>
+                    + Add size / variant
+                  </button>
+                </div>
+
+                <div className="d-flex gap-2">
+                  <button type="submit" className="btn rounded-pill px-4" disabled={saving}
+                    style={{ backgroundColor: theme.primary, color: btnColor, border: "none" }}>
+                    {saving ? "Saving…" : selectedProduct ? "Save changes" : "Create product"}
+                  </button>
+                  <button type="button" className="btn rounded-pill px-3"
+                    style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
+                    onClick={() => { resetProductForm(); setShowProductForm(false); }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* product grid */}
+          <div className="row g-3 mb-3">
+            {products.map((product) => {
+              const thumb = (product.images?.length > 0
+                ? (typeof product.images[0] === "string" ? product.images[0] : product.images[0].image)
+                : product.image) || "/products/activator.jpg";
+              const variantCount = Array.isArray(product.variants) ? product.variants.length : 0;
+              return (
+                <div key={product.product_id ?? product.id} className="col-md-4">
+                  <div className="admin-product-card"
+                    style={{ backgroundColor: surface, border: `1px solid ${theme.borderColor}` }}>
+                    <div className="admin-product-img-wrap">
+                      <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <span className="admin-product-price-badge"
+                        style={{ backgroundColor: theme.primary, color: btnColor }}>
+                        {product.price}
+                      </span>
+                      {variantCount > 0 && (
+                        <span className="admin-product-variant-badge">
+                          {variantCount} variant{variantCount !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                    <div className="admin-product-body">
+                      <h4 className="admin-product-name">{product.name}</h4>
+                      <p className="admin-product-desc" style={{ color: theme.muted }}>
+                        {product.description}
+                      </p>
+                      <div className="d-flex gap-2">
+                        <button type="button" className="btn btn-sm rounded-pill btn-outline-secondary"
+                          onClick={() => editProduct(product)}>
+                          Edit
+                        </button>
+                        <button type="button" className="btn btn-sm rounded-pill btn-outline-danger"
+                          onClick={() => deleteProduct(product.product_id ?? product.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* export */}
+          <div className="admin-export-row">
+            <span className="small fw-semibold" style={{ color: theme.muted }}>Export:</span>
+            <button type="button" className="btn btn-sm rounded-pill"
+              style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
+              onClick={exportPDF}>
+              📄 PDF catalog
+            </button>
+            <button type="button" className="btn btn-sm rounded-pill"
+              style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
+              onClick={exportCSV}>
+              📊 CSV / Excel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════ BLOGS TAB ═══════════════════ */}
+      {activeTab === "blogs" && (
+        <div>
+          <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h3 className="h5 mb-0">Blog posts ({blogs.length})</h3>
+            <button type="button" className="btn btn-sm rounded-pill px-3"
+              style={{ backgroundColor: theme.primary, color: btnColor, border: "none" }}
+              onClick={() => { setShowBlogForm((p) => !p); resetBlogForm(); }}>
+              {showBlogForm ? "✕ Close form" : "+ Add blog post"}
+            </button>
+          </div>
+
+          {showBlogForm && (
+            <div className="admin-form-card mb-4"
+              style={{ backgroundColor: surface, border: `1px solid ${theme.borderColor}` }}>
+              <h4 className="admin-form-title">{selectedBlog ? "Edit blog post" : "New blog post"}</h4>
+              <form onSubmit={handleBlogSubmit}>
+                <div className="admin-form-group mb-3">
+                  <label className="form-label small">Title *</label>
+                  <input type="text" className="form-control rounded-3" style={iStyle}
+                    value={blogForm.title} placeholder="Blog title"
+                    onChange={(e) => handleBlogChange("title", e.target.value)} />
+                </div>
+                <div className="admin-form-group mb-3">
+                  <label className="form-label small">Featured image (file)</label>
+                  <input type="file" accept="image/*" className="form-control rounded-3" style={iStyle}
+                    onChange={(e) => e.target.files[0] && handleBlogImageUpload(e.target.files[0])} />
+                </div>
+                <div className="admin-form-group mb-3">
+                  <label className="form-label small">Or image URL</label>
+                  <input type="text" className="form-control rounded-3" style={iStyle}
+                    value={blogForm.image} placeholder="Paste image URL"
+                    onChange={(e) => handleBlogChange("image", e.target.value)} />
+                </div>
+                {blogForm.image && (
+                  <div className="mb-3">
+                    <img src={blogForm.image} alt="" className="img-fluid rounded-3"
+                      style={{ maxHeight: 180 }} />
+                  </div>
+                )}
+                <div className="admin-form-group mb-3">
+                  <label className="form-label small">Excerpt</label>
+                  <textarea className="form-control rounded-3" rows="2" style={iStyle}
+                    value={blogForm.excerpt} placeholder="Short teaser (auto-generated if blank)"
+                    onChange={(e) => handleBlogChange("excerpt", e.target.value)} />
+                </div>
+                <div className="admin-form-group mb-3">
+                  <label className="form-label small">Content *</label>
+                  <textarea className="form-control rounded-3" rows="9" style={iStyle}
+                    value={blogForm.content} placeholder="Write your blog post…"
+                    onChange={(e) => handleBlogChange("content", e.target.value)} />
+                </div>
+                <div className="d-flex gap-2">
+                  <button type="submit" className="btn rounded-pill px-4" disabled={saving}
+                    style={{ backgroundColor: theme.primary, color: btnColor, border: "none" }}>
+                    {saving ? "Saving…" : selectedBlog ? "Save changes" : "Publish"}
+                  </button>
+                  <button type="button" className="btn rounded-pill px-3"
+                    style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
+                    onClick={() => { resetBlogForm(); setShowBlogForm(false); }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          <div className="row g-3">
+            {blogs.map((blog) => (
+              <div key={blog.blog_id ?? blog.id} className="col-md-6">
+                <div className="admin-product-card"
+                  style={{ backgroundColor: surface, border: `1px solid ${theme.borderColor}` }}>
+                  {blog.image && (
+                    <div className="admin-product-img-wrap">
+                      <img src={blog.image} alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </div>
+                  )}
+                  <div className="admin-product-body">
+                    <h4 className="admin-product-name">{blog.title}</h4>
+                    <p className="admin-product-desc" style={{ color: theme.muted }}>{blog.excerpt}</p>
+                    <div className="d-flex gap-2">
+                      <button type="button" className="btn btn-sm rounded-pill btn-outline-secondary"
+                        onClick={() => editBlog(blog)}>Edit</button>
+                      <button type="button" className="btn btn-sm rounded-pill btn-outline-danger"
+                        onClick={() => deleteBlog(blog.blog_id ?? blog.id)}>Delete</button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="admin-users-section pb-4">
-        <h3 className="h5 mb-3">Registrations</h3>
-        <p className="small mb-3" style={{ color: theme.muted }}>
-          Full table is also available at the hidden <code>/list</code> route.
-        </p>
-        <ListUsers theme={theme} embedded />
-      </div>
+      {/* ═══════════════════ REGISTRATIONS TAB ═══════════════════ */}
+      {activeTab === "registrations" && (
+        <div>
+          <div className="mb-3">
+            <h3 className="h5 mb-1">Registrations</h3>
+            <p className="small mb-0" style={{ color: theme.muted }}>
+              Also available at the hidden <code>/list</code> route.
+            </p>
+          </div>
+          <ListUsers theme={theme} embedded />
+        </div>
+      )}
     </div>
   );
 };

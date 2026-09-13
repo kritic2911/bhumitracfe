@@ -109,9 +109,12 @@ const ProductCatalog = ({ theme, products: productsProp }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProduct]);
 
-  // ── image carousel inside overlay ─────────────────────────────────────────
+  // image carousel inside overlay
   const baseImages = selectedProduct ? getProductImages(selectedProduct) : [];
-  const quantities  = selectedProduct?.quantities || [];
+  // prefer DB-backed variants, fall back to legacy quantities field
+  const variants   = selectedProduct
+    ? (selectedProduct.variants?.length ? selectedProduct.variants : (selectedProduct.quantities || []))
+    : [];
 
   // If a qty with an image is selected, show that image first; else show base images
   const overlayImages = (() => {
@@ -200,10 +203,10 @@ const ProductCatalog = ({ theme, products: productsProp }) => {
                     <div className="price-tag" style={{ backgroundColor: theme.primary, color: btnText }}>
                       {product.price}
                     </div>
-                    {/* Qty badge */}
-                    {product.quantities?.length > 0 && (
+                    {/* Variant badge */}
+                    {((product.variants?.length || 0) + (product.quantities?.length || 0)) > 0 && (
                       <div className="qty-badge">
-                        {product.quantities.length} size{product.quantities.length !== 1 ? "s" : ""}
+                        {(product.variants?.length || product.quantities?.length)} size{(product.variants?.length || product.quantities?.length) !== 1 ? "s" : ""}
                       </div>
                     )}
                   </div>
@@ -301,11 +304,11 @@ const ProductCatalog = ({ theme, products: productsProp }) => {
               </p>
 
               {/* ── Quantity selector ── */}
-              {quantities.length > 0 && (
+              {variants.length > 0 && (
                 <div className="qty-selector">
                   <p className="qty-selector-label" style={{ color: theme.muted }}>Available sizes / quantities:</p>
                   <div className="qty-chips">
-                    {quantities.map((qty) => {
+                    {variants.map((qty) => {
                       const isChosen = selectedQty?.label === qty.label;
                       return (
                         <button
