@@ -1,9 +1,15 @@
+/* ── Product card ──────────────────────────────────────────────────────────── */
+
 .product-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .product-card:hover {
   transform: translateY(-4px);
+}
+
+.product-card--active {
+  transform: translateY(-6px) scale(1.02);
 }
 
 .product-image-container {
@@ -15,10 +21,8 @@
 
 .product-image {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
   object-fit: cover;
   object-position: center;
   transition: transform 0.35s ease;
@@ -28,36 +32,97 @@
   transform: scale(1.04);
 }
 
-.card-body {
-  padding: 1.15rem 1.25rem;
-}
+.card-body { padding: 1.15rem 1.25rem; }
 
 .price-tag {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 12px; right: 12px;
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
   font-weight: 600;
   font-size: 0.85rem;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
 }
 
-.card-title {
-  margin-bottom: 0.5rem;
+.qty-badge {
+  position: absolute;
+  bottom: 10px; left: 10px;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
   font-weight: 600;
+  background: rgba(0,0,0,0.52);
+  color: #fff;
 }
 
-.card-text {
-  line-height: 1.55;
+.card-title  { margin-bottom: 0.5rem; font-weight: 600; }
+.card-text   { line-height: 1.55; }
+
+/* ── Catalog nav (between-product arrows) ─────────────────────────────────── */
+
+.catalog-nav-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
 }
 
-/* ===================== Expanded product overlay ===================== */
+.catalog-grid {
+  flex: 1;
+}
+
+.catalog-nav-arrow {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  z-index: 2;
+}
+
+.catalog-nav-arrow--left  { margin-right: 0.75rem; }
+.catalog-nav-arrow--right { margin-left:  0.75rem; }
+
+.catalog-nav-arrow:hover {
+  opacity: 0.85;
+  transform: scale(1.1);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+}
+
+/* ── Catalog dots ─────────────────────────────────────────────────────────── */
+
+.catalog-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 1.5rem;
+}
+
+.catalog-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.catalog-dot--active {
+  transform: scale(1.35);
+}
+
+/* ── Expanded product overlay ─────────────────────────────────────────────── */
 
 .product-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 28, 22, 0.72);
+  background-color: rgba(15,28,22,0.72);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -83,20 +148,13 @@
 }
 
 @keyframes tileScaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 .product-expanded-close {
   position: absolute;
-  top: 12px;
-  right: 14px;
+  top: 12px; right: 14px;
   z-index: 10;
   background: none;
   border: none;
@@ -106,17 +164,14 @@
   opacity: 0.7;
   transition: opacity 0.15s;
 }
+.product-expanded-close:hover { opacity: 1; }
 
-.product-expanded-close:hover {
-  opacity: 1;
-}
-
-/* ---- Image carousel inside expanded tile ---- */
+/* ── Image carousel inside expanded tile ──────────────────────────────────── */
 
 .product-carousel {
   position: relative;
   width: 100%;
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: rgba(0,0,0,0.04);
   border-radius: 1.25rem 1.25rem 0 0;
   overflow: hidden;
 }
@@ -137,85 +192,58 @@
   object-fit: contain;
   object-position: center;
   display: block;
-  transition: opacity 0.2s ease;
+  animation: imgFadeIn 0.2s ease;
+}
+
+@keyframes imgFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .carousel-arrow {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 50%; transform: translateY(-50%);
   z-index: 5;
   border: none;
-  width: 36px;
-  height: 36px;
+  width: 36px; height: 36px;
   border-radius: 50%;
-  font-size: 1.5rem;
-  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   opacity: 0.85;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
   transition: opacity 0.15s, transform 0.15s;
 }
-
 .carousel-arrow:hover {
   opacity: 1;
   transform: translateY(-50%) scale(1.08);
 }
-
-.carousel-arrow-left {
-  left: 10px;
-}
-
-.carousel-arrow-right {
-  right: 10px;
-}
+.carousel-arrow-left  { left:  10px; }
+.carousel-arrow-right { right: 10px; }
 
 .carousel-dots {
   position: absolute;
-  bottom: 10px;
-  left: 50%;
+  bottom: 10px; left: 50%;
   transform: translateX(-50%);
   display: flex;
   gap: 6px;
 }
 
 .carousel-dot {
-  width: 8px;
-  height: 8px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   transition: background-color 0.2s, transform 0.2s;
 }
+.carousel-dot.active { transform: scale(1.3); }
 
-.carousel-dot.active {
-  transform: scale(1.3);
-}
+/* ── Product info inside expanded tile ────────────────────────────────────── */
 
-/* ---- Product info inside expanded tile ---- */
+.product-expanded-info { padding: 1.25rem 1.5rem 1.5rem; }
 
-.product-expanded-info {
-  padding: 1.25rem 1.5rem 1.5rem;
-}
-
-.product-expanded-name {
-  font-size: 1.15rem;
-  font-weight: 700;
-  margin-bottom: 0.35rem;
-}
-
-.product-expanded-price {
-  font-size: 1.05rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-}
-
-.product-expanded-desc {
-  font-size: 0.92rem;
-  line-height: 1.6;
-  margin-bottom: 1rem;
-}
+.product-expanded-name  { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.35rem; }
+.product-expanded-price { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.75rem; }
+.product-expanded-desc  { font-size: 0.92rem; line-height: 1.6; margin-bottom: 1rem; }
 
 .product-expanded-contact {
   font-size: 0.82rem;
@@ -224,24 +252,83 @@
   opacity: 0.85;
 }
 
-/* ---- Scrollbar polish for expanded tile ---- */
+/* ── Quantity selector ────────────────────────────────────────────────────── */
 
-.product-expanded-tile::-webkit-scrollbar {
-  width: 5px;
+.qty-selector { margin-bottom: 1rem; }
+
+.qty-selector-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
 }
 
+.qty-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.qty-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  border: 1.5px solid;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, transform 0.12s;
+}
+
+.qty-chip:hover { transform: scale(1.06); }
+
+.qty-chip--active {
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+
+.qty-chip-img-hint { font-size: 0.75em; }
+
+.qty-chip-hint {
+  font-size: 0.78rem;
+  font-style: italic;
+  margin-top: 0.2rem;
+  margin-bottom: 0;
+}
+
+/* ── Scrollbar polish ─────────────────────────────────────────────────────── */
+
+.product-expanded-tile::-webkit-scrollbar { width: 5px; }
 .product-expanded-tile::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.3);
+  background: rgba(128,128,128,0.3);
   border-radius: 4px;
 }
 
-/* ---- Responsive ---- */
+/* ── Print stylesheet (for PDF export in admin) ───────────────────────────── */
+
+@media print {
+  .catalog-pdf-print {
+    display: block !important;
+  }
+  body > *:not(.catalog-pdf-print) {
+    display: none !important;
+  }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .catalog-nav-arrow { width: 36px; height: 36px; }
+  .catalog-nav-arrow--left  { margin-right: 0.4rem; }
+  .catalog-nav-arrow--right { margin-left:  0.4rem; }
+}
 
 @media (max-width: 576px) {
-  .product-expanded-tile {
-    max-width: 95vw;
-  }
-  .carousel-current-image {
-    height: 240px;
-  }
+  .product-expanded-tile { max-width: 95vw; }
+  .carousel-current-image { height: 240px; }
+  .catalog-nav-arrow { display: none; } /* arrows hidden on mobile – swipe not yet wired */
 }

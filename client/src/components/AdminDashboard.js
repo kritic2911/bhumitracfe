@@ -19,6 +19,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
     price: "",
     description: "",
     images: [],
+    quantities: [], // [{ label: "1 L", price: "", image: "" }]
   });
   const [statusMessage, setStatusMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -30,7 +31,35 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
 
   const resetProductForm = () => {
     setSelectedProduct(null);
-    setProductForm({ name: "", price: "", description: "", images: [] });
+    setProductForm({ name: "", price: "", description: "", images: [], quantities: [] });
+  };
+
+  // ── Quantity helpers ──
+  const addQuantityRow = () => {
+    setProductForm((prev) => ({
+      ...prev,
+      quantities: [...prev.quantities, { label: "", price: "", image: "" }],
+    }));
+  };
+
+  const updateQuantityRow = (idx, field, value) => {
+    setProductForm((prev) => ({
+      ...prev,
+      quantities: prev.quantities.map((q, i) => (i === idx ? { ...q, [field]: value } : q)),
+    }));
+  };
+
+  const removeQuantityRow = (idx) => {
+    setProductForm((prev) => ({
+      ...prev,
+      quantities: prev.quantities.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleQuantityImageUpload = (idx, file) => {
+    const reader = new FileReader();
+    reader.onload = () => updateQuantityRow(idx, "image", reader.result);
+    reader.readAsDataURL(file);
   };
 
   const handleBlogChange = (field, value) => {
@@ -136,6 +165,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
         description: productForm.description,
         image: imgList[0],
         images: imgList,
+        quantities: productForm.quantities.filter((q) => q.label.trim()),
       };
 
       const response = await fetch(
@@ -178,7 +208,6 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
 
   const editProduct = (product) => {
     setSelectedProduct(product);
-    // Build images list from the product_images array (objects with .image) or fall back to single image
     let imgs = [];
     if (product.images && product.images.length > 0) {
       imgs = product.images.map((img) => (typeof img === "string" ? img : img.image));
@@ -190,6 +219,7 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
       price: product.price,
       description: product.description,
       images: imgs,
+      quantities: Array.isArray(product.quantities) ? product.quantities : [],
     });
     setShowProductForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -483,6 +513,71 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
                 </div>
               </div>
             )}
+            {/* ── Quantities ── */}
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Quantities / sizes (optional)</label>
+              <p className="small mb-2" style={{ color: theme.muted }}>
+                Add size options (e.g. 1 L, 5 L). Each can have its own price and a packaging photo.
+              </p>
+              {productForm.quantities.map((qty, idx) => (
+                <div key={idx} className="d-flex gap-2 align-items-start mb-2 flex-wrap">
+                  <input
+                    type="text"
+                    className="form-control rounded-3"
+                    style={{ ...inputStyle, maxWidth: "100px" }}
+                    placeholder="Label (e.g. 1 L)"
+                    value={qty.label}
+                    onChange={(e) => updateQuantityRow(idx, "label", e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    className="form-control rounded-3"
+                    style={{ ...inputStyle, maxWidth: "100px" }}
+                    placeholder="Price (opt.)"
+                    value={qty.price}
+                    onChange={(e) => updateQuantityRow(idx, "price", e.target.value)}
+                  />
+                  <div className="d-flex flex-column gap-1" style={{ flex: 1 }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="form-control rounded-3"
+                      style={inputStyle}
+                      onChange={(e) => e.target.files[0] && handleQuantityImageUpload(idx, e.target.files[0])}
+                    />
+                    {qty.image && (
+                      <img src={qty.image} alt="" className="rounded-2"
+                        style={{ height: "48px", width: "72px", objectFit: "cover", border: `1px solid ${theme.borderColor}` }} />
+                    )}
+                    <input
+                      type="text"
+                      className="form-control rounded-3"
+                      style={inputStyle}
+                      placeholder="Or paste packaging image URL"
+                      value={qty.image && !qty.image.startsWith("data:") ? qty.image : ""}
+                      onChange={(e) => updateQuantityRow(idx, "image", e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger rounded-pill"
+                    onClick={() => removeQuantityRow(idx)}
+                    style={{ whiteSpace: "nowrap", alignSelf: "flex-start" }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn btn-sm rounded-pill"
+                style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
+                onClick={addQuantityRow}
+              >
+                + Add size / quantity
+              </button>
+            </div>
+
             <button
               type="submit"
               className="btn rounded-pill px-4"
@@ -553,6 +648,59 @@ const AdminDashboard = ({ theme, blogs, products, refreshBlogs, refreshProducts 
               </div>
             </div>
           ))}
+        </div>
+
+        {/* ── Export panel ── */}
+        <div className="d-flex align-items-center gap-3 mt-3 flex-wrap">
+          <span className="small fw-semibold" style={{ color: theme.muted }}>Export catalog:</span>
+          <button
+            type="button"
+            className="btn btn-sm rounded-pill"
+            style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
+            onClick={() => {
+              // Build a printable HTML page and open it
+              const rows = products.map((p) => {
+                const qtys = Array.isArray(p.quantities) && p.quantities.length
+                  ? p.quantities.map((q) => q.label + (q.price ? ` (${q.price})` : "")).join(", ")
+                  : "—";
+                const imgs = Array.isArray(p.images) && p.images.length
+                  ? p.images.map((img) => `<img src="${ typeof img === "string" ? img : img.image }" style="height:60px;width:80px;object-fit:cover;border-radius:4px;margin:2px" />`).join("")
+                  : (p.image ? `<img src="${p.image}" style="height:60px;width:80px;object-fit:cover;border-radius:4px" />` : "—");
+                return `<tr><td style="padding:10px;border:1px solid #ddd">${p.name}</td><td style="padding:10px;border:1px solid #ddd">${qtys}</td><td style="padding:10px;border:1px solid #ddd">${imgs}</td><td style="padding:10px;border:1px solid #ddd;font-weight:600">${p.price}</td></tr>`;
+              }).join("");
+              const html = `<!DOCTYPE html><html><head><title>Bhumitra Product Catalog</title><style>body{font-family:sans-serif;padding:2rem}table{border-collapse:collapse;width:100%}th{background:#2d6a4f;color:#fff;padding:10px;border:1px solid #ddd}@media print{button{display:none}}</style></head><body><h2>Bhumitra Product Catalog</h2><button onclick="window.print()">Print / Save as PDF</button><br/><br/><table><thead><tr><th>Product</th><th>Quantities</th><th>Images</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+              const win = window.open("", "_blank");
+              win.document.write(html);
+              win.document.close();
+            }}
+          >
+            📄 Export PDF
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm rounded-pill"
+            style={{ borderColor: theme.borderColor, color: theme.text, background: "transparent" }}
+            onClick={() => {
+              const header = "Product Name,Quantities,Image URLs,Price";
+              const rows = products.map((p) => {
+                const qtys = Array.isArray(p.quantities) && p.quantities.length
+                  ? `"${p.quantities.map((q) => q.label + (q.price ? ` (${q.price})` : "")).join("; ")}"`
+                  : "";
+                const imgs = Array.isArray(p.images) && p.images.length
+                  ? `"${p.images.map((img) => (typeof img === "string" ? img : img.image)).join("; ")}"`
+                  : `"${p.image || ""}"`;
+                return `"${p.name.replace(/"/g, '""')}",${qtys},${imgs},"${p.price}"`;
+              });
+              const csv = [header, ...rows].join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = "bhumitra_catalog.csv";
+              a.click(); URL.revokeObjectURL(url);
+            }}
+          >
+            📊 Export Excel (CSV)
+          </button>
         </div>
       </div>
 

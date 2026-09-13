@@ -54,9 +54,9 @@ async function run() {
 run()
   .then(() => process.exit(0))
   .catch((err) => {
-    console.error("Migration failed:");
-    console.error("message:", err && err.message ? err.message : "(none)");
-    console.error("stack:", err && err.stack ? err.stack : "(none)");
-    console.error("details:", err);
-    process.exit(1);
+    console.warn("⚠️  Migration could not run (DB may be unreachable). Server will start anyway.");
+    console.warn("   Error:", err && err.message ? err.message : String(err));
+    // Exit 0 so the server process still starts — DB routes will fail per-request instead.
+    process.exit(0);
   });
+
